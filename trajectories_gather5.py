@@ -28,7 +28,7 @@ std, mean preprocess for pretrained models
 '''
 
 class TrajectoryBuffer:
-    def __init__(self, buffer_size=10, im_resolution = (640,480), num_transitions=100, always=True):
+    def __init__(self, image_topic = '/image_raw', cmd_vel_topic = 'robot_base_velocity_controller/cmd_vel',buffer_size=10, im_resolution = (640,480), num_transitions=100, always=True, reset_environment=True):
         self.always = always
         self.num_transitions = num_transitions
         self.im_resolution = im_resolution
@@ -41,6 +41,7 @@ class TrajectoryBuffer:
             mean=[0.485, 0.456, 0.406],
             std=[0.229, 0.224, 0.225]
             )
+        self.reset_environment = reset_environment
         #self.preprocess = transforms.Compose([
         #    transforms.Resize((224, 224)),  # Resize to match MobileNetV2 input size
         #    transforms.ToTensor(),           # Convert to tensor
@@ -52,9 +53,10 @@ class TrajectoryBuffer:
 
         # Initialize the ROS node and subscribe to the image topic
         rospy.init_node('traj_gather_node', anonymous=True)
-        rospy.Subscriber('/image_raw', Image, self.callback_image)
-        rospy.Subscriber('robot_base_velocity_controller/cmd_vel', Twist, self.callback_action)
-        self.coord_pub = rospy.Publisher('/gazebo/set_model_state', ModelState, queue_size=2)
+        rospy.Subscriber(image_topic, Image, self.callback_image)
+        rospy.Subscriber(cmd_vel_topic, Twist, self.callback_action)
+        if reset_environment:
+            self.coord_pub = rospy.Publisher('/gazebo/set_model_state', ModelState, queue_size=2)
 
     def new_traj(self):
         if self.gather:
@@ -88,12 +90,11 @@ class TrajectoryBuffer:
             self.actions_buffer[-1].append(self.action[0])
             if len(self.states_buffer[-1])==self.num_transitions:
                 self.new_traj()
-                rospy.wait_for_service('/gazebo/reset_world')
-                reset_world = rospy.ServiceProxy('/gazebo/reset_world', Empty)
-                reset_world()
-                self.set_cube_coord()
-                #self.set_cube_coord()
-                #self.set_cube_coord()
+                if self.reset_environment:
+                    rospy.wait_for_service('/gazebo/reset_world')
+                    reset_world = rospy.ServiceProxy('/gazebo/reset_world', Empty)
+                    reset_world()
+                    self.set_cube_coord()
 
 
  
@@ -149,9 +150,12 @@ if __name__ == '__main__':
     # Create the ImageBuffer instance
     traj_buffer = TrajectoryBuffer(
         buffer_size=2,  
-        im_resolution=(224,224),  
+        im_resolution=(640,480),  
         num_transitions=10, 
-        always = True
+        always = True,
+        image_topic= '/camera/rgb/image_raw',
+        cmd_vel_topic= '/cmd_vel',
+        reset_environment= False
         )
 
     t1 = threading.Thread(target=rospy_thread)

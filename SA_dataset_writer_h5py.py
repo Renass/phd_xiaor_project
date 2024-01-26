@@ -56,15 +56,18 @@ def behav_clon_thread():
     print('Buffer saved')
 
 if __name__ == '__main__':
-    BUFFER_SIZE = 100
-    IM_RESOLUTION = (224, 224)
-    NUM_TRANSITIONS = 100
+    BUFFER_SIZE = 2
+    IM_RESOLUTION = (640, 480)
+    NUM_TRANSITIONS = 30
 
     traj_buffer = trajectories_gather5.TrajectoryBuffer(
         buffer_size=BUFFER_SIZE, 
         im_resolution=IM_RESOLUTION, 
         num_transitions=NUM_TRANSITIONS, 
-        always=False
+        always=False,
+        image_topic= '/camera/rgb/image_raw',
+        cmd_vel_topic= '/cmd_vel',
+        reset_environment= False
     )
 
     t1 = threading.Thread(target=rospy_thread)

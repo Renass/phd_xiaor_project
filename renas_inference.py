@@ -171,7 +171,7 @@ if __name__ == '__main__':
 
     traj_buffer = trajectories_gather5.TrajectoryBuffer(
         buffer_size=BUFFER_SIZE,  im_resolution=IM_RESOLUTION, 
-        num_transitions=SEQUENCE_LENGTH, always=True)
+        num_transitions=SEQUENCE_LENGTH, always=True, reset_environment=False)
     
     driv_pub = rospy.Publisher('robot_base_velocity_controller/cmd_vel', Twist, queue_size=1)
 
