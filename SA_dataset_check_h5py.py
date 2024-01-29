@@ -8,18 +8,19 @@ import matplotlib.animation as animation
 Check one trajectory from dataset as a video
 '''
 
-save_dir = 'sa-traj_dataset'
-filename = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/sa-trajs2024-01-26_21-12-27.h5'
-file = h5py.File(filename, 'r')
-#matplotlib.use('TkAgg') 
+FILENAME = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/real_pink_gates/sa-trajs2024-01-29_19-59-45.h5'
 
 def update(frame):
     plt.clf()
     plt.imshow(im[frame].transpose(1, 2, 0))
     plt.axis('off')
+    plt.text(0.5, -0.1, f'Action: {actions[frame]}', ha='center', va='center', transform=ax.transAxes, fontsize=12)
+
+save_dir = 'sa-traj_dataset'
+file = h5py.File(FILENAME, 'r')
 
 im = file['states']['data'][0]
-print(im.shape)
-fig = plt.figure()
-ani = animation.FuncAnimation(fig, update, frames= 100, repeat=False, interval=30)
+actions = file['actions']['data'][0]
+fig, ax = plt.subplots()
+ani = animation.FuncAnimation(fig, update, frames= len(im), repeat=False, interval=500)
 plt.show()

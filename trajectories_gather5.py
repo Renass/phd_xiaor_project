@@ -28,7 +28,7 @@ std, mean preprocess for pretrained models
 '''
 
 class TrajectoryBuffer:
-    def __init__(self, image_topic = '/image_raw', cmd_vel_topic = 'robot_base_velocity_controller/cmd_vel',buffer_size=10, im_resolution = (640,480), num_transitions=100, always=True, reset_environment=True):
+    def __init__(self, image_topic = '/image_raw', cmd_vel_topic = 'robot_base_velocity_controller/cmd_vel',buffer_size=10, im_resolution = (640,480), im_preproc = True, num_transitions=100, always=True, reset_environment=True):
         self.always = always
         self.num_transitions = num_transitions
         self.im_resolution = im_resolution
@@ -37,10 +37,12 @@ class TrajectoryBuffer:
         self.actions_buffer = deque([[]], maxlen=buffer_size)
         self.action = deque([(0, 0)], maxlen=1)
         self.gather = True
-        self.preprocess = transforms.Normalize(    
-            mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225]
-            )
+        self.im_preproc = im_preproc
+        if im_preproc:
+            self.preprocess = transforms.Normalize(    
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225]
+                )
         self.reset_environment = reset_environment
         #self.preprocess = transforms.Compose([
         #    transforms.Resize((224, 224)),  # Resize to match MobileNetV2 input size
@@ -85,7 +87,8 @@ class TrajectoryBuffer:
             image = CvBridge().imgmsg_to_cv2(msg, "bgr8")
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             image = transforms.ToTensor()(image)
-            image = self.preprocess(image)
+            if self.im_preproc:
+                image = self.preprocess(image)
             self.states_buffer[-1].append(image)
             self.actions_buffer[-1].append(self.action[0])
             if len(self.states_buffer[-1])==self.num_transitions:

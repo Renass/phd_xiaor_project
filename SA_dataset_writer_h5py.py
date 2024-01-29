@@ -13,6 +13,11 @@ Write a SA dataset as a HDF5 file with gzip
 imports: trajectories_gather5
 '''
 
+BUFFER_SIZE = 1
+IM_RESOLUTION = (640, 480)
+NUM_TRANSITIONS = 100
+SAVE_DIR = 'sa-traj_dataset/real'
+
 def rospy_thread():
     while not rospy.is_shutdown():
         try:
@@ -24,7 +29,7 @@ def behav_clon_thread():
     while traj_buffer.gather == True:
         time.sleep(1)
 
-    save_dir = 'sa-traj_dataset'
+    save_dir = SAVE_DIR
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -56,13 +61,11 @@ def behav_clon_thread():
     print('Buffer saved')
 
 if __name__ == '__main__':
-    BUFFER_SIZE = 2
-    IM_RESOLUTION = (640, 480)
-    NUM_TRANSITIONS = 30
 
     traj_buffer = trajectories_gather5.TrajectoryBuffer(
         buffer_size=BUFFER_SIZE, 
-        im_resolution=IM_RESOLUTION, 
+        im_resolution=IM_RESOLUTION,
+        im_preproc= False, 
         num_transitions=NUM_TRANSITIONS, 
         always=False,
         image_topic= '/camera/rgb/image_raw',

@@ -14,7 +14,7 @@ Robot description, logic models and plugins
 
 
 
-v24.01.2024
+v29.01.2024
 Ubuntu 20.04.6 LTS
 ROS noetic
 Python 3.8.10
