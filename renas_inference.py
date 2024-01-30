@@ -24,12 +24,16 @@ hdf Dataset
 '''
 
 BUFFER_SIZE = 1
-IM_RESOLUTION = (224, 224)
-SEQUENCE_LENGTH = 30
+IM_RESOLUTION = (640, 480)
+SEQUENCE_LENGTH = 20
 
-LOAD_WEIGHTS = 'renas.pt'
+CMD_PUBLISH_TOPIC = '/cmd_vel'
+#CMD_PUBLISH_TOPIC = 'robot_base_velocity_controller/cmd_vel'
 
-PROMPT = "Go to the ball"
+
+LOAD_WEIGHTS = '/home/renas/pythonprogv2/phd_xiaor_project/weights/renas3_real.pt'
+
+PROMPT = 'Go through the pink gates. Avoid touching the obstacles.'
 
 def publish_twist(publisher, a):
     twist_msg = Twist()
@@ -170,10 +174,16 @@ if __name__ == '__main__':
     print('weights loaded from file.')
 
     traj_buffer = trajectories_gather5.TrajectoryBuffer(
-        buffer_size=BUFFER_SIZE,  im_resolution=IM_RESOLUTION, 
-        num_transitions=SEQUENCE_LENGTH, always=True, reset_environment=False)
+        buffer_size=BUFFER_SIZE,  
+        im_resolution=IM_RESOLUTION,
+        im_preproc= False, 
+        num_transitions=SEQUENCE_LENGTH, 
+        always=True,
+        image_topic= '/camera/rgb/image_raw',
+        cmd_vel_topic= '/cmd_vel', 
+        reset_environment=False)
     
-    driv_pub = rospy.Publisher('robot_base_velocity_controller/cmd_vel', Twist, queue_size=1)
+    driv_pub = rospy.Publisher(CMD_PUBLISH_TOPIC, Twist, queue_size=1)
 
     t1 = threading.Thread(target=rospy_thread)
     t2 = threading.Thread(target=behav_clon_inference_thread)
