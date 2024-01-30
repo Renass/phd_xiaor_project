@@ -14,7 +14,7 @@ Robot description, logic models and plugins
 
 
 
-v29.01.2024
+v30.01.2024
 Ubuntu 20.04.6 LTS
 ROS noetic
 Python 3.8.10
@@ -52,6 +52,7 @@ renas2.pt - renas_train_multiproc2 weights file loss is 0.62 with LR=10e-5
 renas3.pt = renas_train_multiproc3 weights file LR 10e-5 40 epochs loss 0.39
 renas3_last.pt - renas_train_multiproc3 weights file LR 10e-5 90 epochs loss 0.1519
 renas3_ag.pt - renas_train_multiproc3 weights file LR 10e-5 120 epochs loss 0.1488
+renas3_real.pt - renas_train_multiproc3 weights for real_pink_gates dataset
 
 
 

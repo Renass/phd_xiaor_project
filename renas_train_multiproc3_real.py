@@ -29,7 +29,7 @@ hdf Dataset - real world objects
 3. (Text-Image)-(action) causal Transformer GPT 
 '''
 
-LR = 10e-5
+LR = 10e-6
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 
@@ -43,7 +43,7 @@ DEVICE_NUM = 2
 
 
 WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
-LOAD_WEIGHTS = 'renas3_last.pt'
+LOAD_WEIGHTS = 'renas3_real.pt'
 SAVE_WEIGHTS = 'renas3.pt'
 
 DATASET1 = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/real_pink_gates/sa-trajs_combined.h5'
