@@ -16,7 +16,7 @@ imports: trajectories_gather5
 BUFFER_SIZE = 1
 IM_RESOLUTION = (640, 480)
 NUM_TRANSITIONS = 100
-SAVE_DIR = 'sa-traj_dataset/real'
+SAVE_DIR = 'sa-traj_dataset/real_pink_gates2'
 
 def rospy_thread():
     while not rospy.is_shutdown():
