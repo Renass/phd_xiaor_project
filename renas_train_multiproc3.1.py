@@ -16,15 +16,17 @@ from torch.optim.lr_scheduler import SequentialLR, LinearLR, CosineAnnealingLR, 
 import math 
 from transformers import ViltProcessor, ViltModel
 from transformers import OpenAIGPTConfig, OpenAIGPTModel
+import numpy as np
 
 
 '''
 Behavioral cloning Renas  transformer TRAIN LOOP
-Actions are resolved as a regression task
-hdf Dataset
+Actions are resolved as a classification task
 
-1. TEXT-Image encoding using ViLT (trainable) (modality encoding)
-2. Text-Image cls tokens and action tokens (positional-encoding?) (modality-encoding) 
+hdf Dataset - real world objects
+
+1. TEXT-Image encoding using ViLT (trainable) (modality encoding?)
+2. Text-Image cls tokens and action tokens (positional-encoding?) (modality-encoding?) 
 3. (Text-Image)-(action) causal Transformer GPT 
 '''
 
@@ -41,15 +43,15 @@ CHECKPOINT_INTERVAL = 10
 DEVICE_NUM = 2
 
 
+WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
+LOAD_WEIGHTS = 'renas3_last.pt'
+SAVE_WEIGHTS = 'renas3.pt'
 
-LOAD_WEIGHTS = '/home/renas/pythonprogv2/phd_xiaor_project/weights/renas3_last.pt'
-SAVE_WEIGHTS = '/home/renas/pythonprogv2/phd_xiaor_project/weights/renas3.pt'
+DATASET1 = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/real_pink_gates/sa-trajs_combined.h5'
+#DATASET2 = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/sa-trajs2023-11-08_14-31-15.h5'
 
-DATASET1 = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/sa-trajs2023-11-08_13-37-35.h5'
-DATASET2 = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/sa-trajs2023-11-08_14-31-15.h5'
-#PROMPT = ["Go to the cube"]* SEQ_LENGTH*BATCH_SIZE
-PROMPT1 = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/sa-trajs2023-11-08_13-37-35_prompt.txt'
-PROMPT2 = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/sa-trajs2023-11-08_14-31-15_prompt.txt'   
+PROMPT1 = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/real_pink_gates/prompt.txt'
+#PROMPT2 = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/sa-trajs2023-11-08_14-31-15_prompt.txt'   
 
 
 class PositionalEncoding(torch.nn.Module):
@@ -91,7 +93,7 @@ class Renas(torch.nn.Module):
             param.requires_grad = True
 
         self.fc = torch.nn.Sequential(
-            torch.nn.Linear(2, 768),
+            torch.nn.Linear(9, 768),
         #    torch.nn.GELU(),
         #    torch.nn.Linear(768, 768)
             )
@@ -102,7 +104,7 @@ class Renas(torch.nn.Module):
         self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=4, n_head=12)
         self.gpt_model = OpenAIGPTModel(self.gpt_config)
 
-        self.fc2 = torch.nn.Linear(768, 2)
+        self.fc2 = torch.nn.Linear(768, 9)
 
 
     def forward(self, states_tensor, actions_tensor, prompt):
@@ -169,16 +171,16 @@ def ddp_train_loop(rank, world_size, train_dataset, test_dataset):
     scheduler2 = CosineAnnealingLR(optimizer, T_max=LR_DECAY_EPOCHS, eta_min= LR/10)
     scheduler3 = ConstantLR(optimizer, factor=LR/10, total_iters= 100000)
     scheduler = SequentialLR(optimizer, schedulers=[scheduler1, scheduler2, scheduler3], milestones=[LR_WARMUP_EPOCHS, LR_WARMUP_EPOCHS+LR_DECAY_EPOCHS])
-    criterion = torch.nn.MSELoss()
+    criterion = torch.nn.CrossEntropyLoss()
 
     if rank == 0:
         ten_board_writer = SummaryWriter()
     
 
-    if os.path.isfile(LOAD_WEIGHTS):
+    if os.path.isfile(os.path.join(WEIGHTS_DIR, LOAD_WEIGHTS)):
         model_dict = model.module.state_dict()
-        pretrained_dict = torch.load(LOAD_WEIGHTS)
-        pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+        pretrained_dict = torch.load(os.path.join(WEIGHTS_DIR, LOAD_WEIGHTS))
+        pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict and model_dict[k].size() == v.size()}
         model_dict.update(pretrained_dict)
         model.module.load_state_dict(model_dict)
         del model_dict, pretrained_dict
@@ -241,11 +243,30 @@ def ddp_train_loop(rank, world_size, train_dataset, test_dataset):
     
     
         if epoch % CHECKPOINT_INTERVAL == 0 and rank==0:
-            torch.save(model.module.state_dict(), 'temp_'+ SAVE_WEIGHTS)
-            shutil.move('temp_'+ SAVE_WEIGHTS, SAVE_WEIGHTS)
+            torch.save(model.module.state_dict(), os.path.join(WEIGHTS_DIR, 'temp_'+ SAVE_WEIGHTS))
+            shutil.move(os.path.join(WEIGHTS_DIR, 'temp_'+ SAVE_WEIGHTS), os.path.join(WEIGHTS_DIR, SAVE_WEIGHTS))
             print('weights saved')
     destroy_process_group()
 
+def actions_to_options(actions):
+    '''Switch [batch_size, seq_length, 2] numpy actions to [batch_size, seq_length, 9] action options'''
+    batch_size, seq_length, _ = actions.shape
+    velocity_pairs = np.array([
+        [0.5, 1],
+        [0.5, 0],
+        [0.5, -1],
+        [0, 1],
+        [0, 0],
+        [0, -1],
+        [-0.5, 1],
+        [-0.5, 0],
+        [-0.5, -1]
+    ])
+    encoded_actions = np.zeros((batch_size, seq_length, 9), dtype=int)
+    distances = np.sum((actions[:, :, np.newaxis, :] - velocity_pairs[np.newaxis, np.newaxis, :, :]) ** 2, axis=3)
+    closest_indices = np.argmin(distances, axis=2)
+    encoded_actions[np.arange(batch_size)[:, np.newaxis], np.arange(seq_length), closest_indices] = 1
+    return encoded_actions
 
 
 if __name__ == '__main__':
@@ -258,26 +279,26 @@ if __name__ == '__main__':
     else:
         print('No CUDA devices available')
     
-    #Taking dataset from 2 files
     data_file1 = h5py.File(DATASET1, 'r')
     states_tensor1 = data_file1['states']['data'][:DATA_SAMPLES]
     states_tensor1 = torch.from_numpy(states_tensor1)
     actions_tensor1 = data_file1['actions']['data'][:DATA_SAMPLES]
-    actions_tensor1 = torch.from_numpy(actions_tensor1)
+    actions_tensor1 = actions_to_options(actions_tensor1)
+    actions_tensor1 = torch.from_numpy(actions_tensor1).float()
     prompts1 = open(PROMPT1, 'r').read().splitlines()*states_tensor1.shape[0]
     
-    data_file2 = h5py.File(DATASET2, 'r')
-    states_tensor2 = data_file2['states']['data'][:DATA_SAMPLES]
-    states_tensor2 = torch.from_numpy(states_tensor2)
-    actions_tensor2 = data_file2['actions']['data'][:DATA_SAMPLES]
-    actions_tensor2 = torch.from_numpy(actions_tensor2)
-    prompts2 = open(PROMPT2, 'r').read().splitlines()*states_tensor2.shape[0]
+    #data_file2 = h5py.File(DATASET2, 'r')
+    #states_tensor2 = data_file2['states']['data'][:DATA_SAMPLES]
+    #states_tensor2 = torch.from_numpy(states_tensor2)
+    #actions_tensor2 = data_file2['actions']['data'][:DATA_SAMPLES]
+    #actions_tensor2 = torch.from_numpy(actions_tensor2)
+    #prompts2 = open(PROMPT2, 'r').read().splitlines()*states_tensor2.shape[0]
 
-    states_tensor = torch.cat((states_tensor1, states_tensor2), dim=0)
-    del states_tensor1, states_tensor2
-    actions_tensor = torch.cat((actions_tensor1, actions_tensor2), dim=0)
-    del actions_tensor1, actions_tensor2
-    prompts = prompts1 + prompts2
+    states_tensor = states_tensor1
+    del states_tensor1
+    actions_tensor = actions_tensor1
+    del actions_tensor1
+    prompts = prompts1
 
     train_states, test_states, train_actions, test_actions, train_prompts, test_prompts = train_test_split(
         states_tensor, 

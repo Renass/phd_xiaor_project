@@ -33,7 +33,7 @@ CMD_PUBLISH_TOPIC = '/cmd_vel'
 
 LOAD_WEIGHTS = '/home/renas/pythonprogv2/phd_xiaor_project/weights/renas3_real.pt'
 
-PROMPT = 'Go through the pink gates. Avoid touching the obstacles.'
+PROMPT = 'Go to the green object'
 
 def publish_twist(publisher, a):
     twist_msg = Twist()
