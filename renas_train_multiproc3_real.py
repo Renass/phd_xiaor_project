@@ -49,7 +49,7 @@ SAVE_WEIGHTS = 'renas3.pt'
 DATASET1 = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/real_pink_gates/sa-trajs_combined.h5'
 #DATASET2 = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/sa-trajs2023-11-08_14-31-15.h5'
 
-PROMPT1 = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/sa-trajs2023-11-08_13-37-35_prompt.txt'
+PROMPT1 = 'sa-traj_dataset/real_pink_gates/prompt.txt'
 #PROMPT2 = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/sa-trajs2023-11-08_14-31-15_prompt.txt'   
 
 
