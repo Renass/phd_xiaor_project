@@ -8,7 +8,7 @@ import matplotlib.animation as animation
 Check one trajectory from dataset as a video
 '''
 
-FILENAME = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/real_pink_gates/sa-trajs2024-01-29_20-39-16.h5'
+FILENAME = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/real_pink_gates/sa-trajs_combined.h5'
 
 def update(frame):
     plt.clf()
@@ -19,8 +19,8 @@ def update(frame):
 save_dir = 'sa-traj_dataset'
 file = h5py.File(FILENAME, 'r')
 
-im = file['states']['data'][0]
-actions = file['actions']['data'][0]
+im = file['states']['data'][90]
+actions = file['actions']['data'][90]
 fig, ax = plt.subplots()
 ani = animation.FuncAnimation(fig, update, frames= len(im), repeat=False, interval=200)
 plt.show()

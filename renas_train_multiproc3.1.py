@@ -35,7 +35,7 @@ LR_WARMUP_EPOCHS = 5
 LR_DECAY_EPOCHS = 100
 
 # How many data samples to take from every data file
-DATA_SAMPLES = None  #For ALL data set: None
+DATA_SAMPLES = 1  #For ALL data set: None
 BATCH_SIZE = 1
 SEQ_LENGTH = 100
 TEST_PART = 0.2
@@ -248,20 +248,22 @@ def ddp_train_loop(rank, world_size, train_dataset, test_dataset):
             print('weights saved')
     destroy_process_group()
 
-def actions_to_options(actions):
+def actions_to_options(actions, velocity_pairs=None):
     '''Switch [batch_size, seq_length, 2] numpy actions to [batch_size, seq_length, 9] action options'''
     batch_size, seq_length, _ = actions.shape
-    velocity_pairs = np.array([
-        [0.5, 1],
-        [0.5, 0],
-        [0.5, -1],
-        [0, 1],
-        [0, 0],
-        [0, -1],
-        [-0.5, 1],
-        [-0.5, 0],
-        [-0.5, -1]
-    ])
+    if velocity_pairs == None:
+        print('Velocity pairs are not defined. Standart teleop_twist_keyboard applied.')
+        velocity_pairs = np.array([
+            [0.5, 1],
+            [0.5, 0],
+            [0.5, -1],
+            [0, 1],
+            [0, 0],
+            [0, -1],
+            [-0.5, 1],
+            [-0.5, 0],
+            [-0.5, -1]
+        ])
     encoded_actions = np.zeros((batch_size, seq_length, 9), dtype=int)
     distances = np.sum((actions[:, :, np.newaxis, :] - velocity_pairs[np.newaxis, np.newaxis, :, :]) ** 2, axis=3)
     closest_indices = np.argmin(distances, axis=2)
@@ -283,8 +285,11 @@ if __name__ == '__main__':
     states_tensor1 = data_file1['states']['data'][:DATA_SAMPLES]
     states_tensor1 = torch.from_numpy(states_tensor1)
     actions_tensor1 = data_file1['actions']['data'][:DATA_SAMPLES]
+    print('here')
+    print(actions_tensor1)
     actions_tensor1 = actions_to_options(actions_tensor1)
     actions_tensor1 = torch.from_numpy(actions_tensor1).float()
+    print(actions_tensor1)
     prompts1 = open(PROMPT1, 'r').read().splitlines()*states_tensor1.shape[0]
     
     #data_file2 = h5py.File(DATASET2, 'r')
@@ -312,7 +317,7 @@ if __name__ == '__main__':
     train_dataset = StateActionPromptDataset(train_states, train_actions, train_prompts)
     test_dataset = StateActionPromptDataset(test_states, test_actions, test_prompts)
 
-    mp.spawn(ddp_train_loop,args=(world_size,train_dataset, test_dataset), nprocs=world_size, join=True)
+    #mp.spawn(ddp_train_loop,args=(world_size,train_dataset, test_dataset), nprocs=world_size, join=True)
 
 
     

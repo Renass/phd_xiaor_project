@@ -10,10 +10,11 @@ import torchvision.models as models
 import math
 from transformers import ViltProcessor, ViltModel
 from transformers import OpenAIGPTConfig, OpenAIGPTModel
+import numpy as np
 
 '''
 Behavioral cloning Renas  transformer INFERENCE
-Actions are resolved as a regression task
+Actions are resolved as a CLASSIFICATION task
 hdf Dataset
 
 1. TEXT-Image encoding using ViLT (trainable) (modality encoding?)
@@ -29,10 +30,46 @@ SEQUENCE_LENGTH = 20
 CMD_PUBLISH_TOPIC = '/cmd_vel'
 #CMD_PUBLISH_TOPIC = 'robot_base_velocity_controller/cmd_vel'
 
+IMAGE_TOPIC = 'camera/rgb/image_raw'
 
-LOAD_WEIGHTS = '/home/renas/pythonprogv2/phd_xiaor_project/weights/renas3_last.pt'
 
-PROMPT = 'Go to the green object'
+LOAD_WEIGHTS = '/home/renas/pythonprogv2/phd_xiaor_project/weights/renas3.pt'
+
+PROMPT = 'Move to the pink object'
+
+VELOCITY_PAIRS = np.array([
+        [0.5, 1],
+        [0.5, 0],
+        [0.5, -1],
+        [0, 1],
+        [0, 0],
+        [0, -1],
+        [-0.5, 1],
+        [-0.5, 0],
+        [-0.5, -1]
+    ])
+
+def actions_to_options(actions, velocity_pairs=None):
+    '''Switch [batch_size, seq_length, 2] numpy actions to [batch_size, seq_length, 9] action options'''
+    batch_size, seq_length, _ = actions.shape
+    if velocity_pairs == None:
+        print('Velocity pairs are not defined. Standart teleop_twist_keyboard applied.')
+        velocity_pairs = np.array([
+            [0.5, 1],
+            [0.5, 0],
+            [0.5, -1],
+            [0, 1],
+            [0, 0],
+            [0, -1],
+            [-0.5, 1],
+            [-0.5, 0],
+            [-0.5, -1]
+        ])
+    encoded_actions = np.zeros((batch_size, seq_length, 9), dtype=int)
+    distances = np.sum((actions[:, :, np.newaxis, :] - velocity_pairs[np.newaxis, np.newaxis, :, :]) ** 2, axis=3)
+    closest_indices = np.argmin(distances, axis=2)
+    encoded_actions[np.arange(batch_size)[:, np.newaxis], np.arange(seq_length), closest_indices] = 1
+    return encoded_actions
 
 def publish_twist(publisher, a):
     twist_msg = Twist()
@@ -61,14 +98,15 @@ def behav_clon_inference_thread():
                 if len(traj_buffer.states_buffer[-1]) >  0:
                     start_time = time.time()
                     states = torch.stack(traj_buffer.states_buffer[-1], dim=0).unsqueeze(0)
-                    actions = torch.tensor(traj_buffer.actions_buffer[-1]).unsqueeze(0).float()
+                    actions = torch.tensor(traj_buffer.actions_buffer[-1]).unsqueeze(0)
+                    actions = torch.tensor(actions_to_options(actions.numpy())).float()
                     if states.shape[1] == actions.shape[1]:
                         output = model.forward(states, actions, prompt=[PROMPT])
                         #print('cnn_output', cnn_output.shape)
-                        action = output[-1,-1,:].squeeze(0).squeeze(0).cpu().detach().numpy()
+                        action = output[-1,-1,:].cpu().detach().numpy()
+                        action = VELOCITY_PAIRS[np.argmax(action)]
                         publish_twist(driv_pub, action)
-                        #prob = cnn_output[-1].data[1].item()*100
-                        #format_prob = "{:.2f}".format(prob)
+ 
                     
                     end_time = time.time()
                     print('one_move time :', end_time - start_time)
@@ -112,7 +150,7 @@ class Renas(torch.nn.Module):
             param.requires_grad = True
 
         self.fc = torch.nn.Sequential(
-            torch.nn.Linear(2, 768),
+            torch.nn.Linear(9, 768),
         #    torch.nn.GELU(),
         #    torch.nn.Linear(768, 768)
             )
@@ -123,7 +161,7 @@ class Renas(torch.nn.Module):
         self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=4, n_head=12)
         self.gpt_model = OpenAIGPTModel(self.gpt_config)
 
-        self.fc2 = torch.nn.Linear(768, 2)
+        self.fc2 = torch.nn.Linear(768, 9)
 
 
     def forward(self, states_tensor, actions_tensor, prompt):
@@ -178,8 +216,8 @@ if __name__ == '__main__':
         im_preproc= False, 
         num_transitions=SEQUENCE_LENGTH, 
         always=True,
-        image_topic= '/camera/rgb/image_raw',
-        cmd_vel_topic= '/cmd_vel', 
+        image_topic= IMAGE_TOPIC,
+        cmd_vel_topic= CMD_PUBLISH_TOPIC, 
         reset_environment=False)
     
     driv_pub = rospy.Publisher(CMD_PUBLISH_TOPIC, Twist, queue_size=1)
