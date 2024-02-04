@@ -50,7 +50,8 @@ tensorboard --logdir=/home/renas/pythonprogv2/phd_xiaor_project --port=6007
 weights files:
 renas3_last.pt - renas_train_multiproc3 weights file LR 10e-5 90 epochs loss 0.1519
 renas3_ag.pt - renas_train_multiproc3 weights file LR 10e-5 120 epochs loss 0.1488
-renas3_real.pt - renas_train_multiproc3 weights for real_pink_gates dataset LR 1oe-5 90 epochs loss 0.1472
+
+
 renas3.1_env.pt - renas_train_multiproc3.1 weights file LR 10e-5 env 70 epoch loss about 45.0
 renas3.1_pink_gates.pt renas_train_multiproc3.1 weights file LR 10e-5 40 epoch loss 48.06
 

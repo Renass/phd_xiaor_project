@@ -29,12 +29,12 @@ hdf Dataset - real world objects
 3. (Text-Image)-(action) causal Transformer GPT 
 '''
 
-LR = 10e-6
+LR = 10e-5
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 
 # How many data samples to take from every data file
-DATA_SAMPLES = None  #For ALL data set: None
+DATA_SAMPLES = 80  #For ALL data set: None
 BATCH_SIZE = 1
 SEQ_LENGTH = 100
 TEST_PART = 0.2
@@ -43,7 +43,7 @@ DEVICE_NUM = 2
 
 
 WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
-LOAD_WEIGHTS = 'renas3_real.pt'
+LOAD_WEIGHTS = 'renas3_last.pt'
 SAVE_WEIGHTS = 'renas3.pt'
 
 DATASET1 = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/real_pink_gates/sa-trajs_combined.h5'
@@ -197,6 +197,7 @@ def ddp_train_loop(rank, world_size, train_dataset, test_dataset):
 
 
     epoch = 0
+    min_loss = 10000
     while True:
         epoch += 1
         total_loss = 0
@@ -234,7 +235,8 @@ def ddp_train_loop(rank, world_size, train_dataset, test_dataset):
                 del output, batch_action
                 test_total_loss += test_loss  
                 del test_loss
-            test_average_loss = test_total_loss/len(test_dataloader)   
+            torch.distributed.all_reduce(test_total_loss, op=torch.distributed.ReduceOp.SUM)
+            test_average_loss = test_total_loss/len(test_dataloader)/world_size   
             if rank==0:     
                 ten_board_writer.add_scalar('Test_Loss', test_average_loss.item(), epoch)
         epoch_train_time_end = time.time()
@@ -244,6 +246,12 @@ def ddp_train_loop(rank, world_size, train_dataset, test_dataset):
         if epoch % CHECKPOINT_INTERVAL == 0 and rank==0:
             torch.save(model.module.state_dict(), os.path.join(WEIGHTS_DIR, 'temp_'+ SAVE_WEIGHTS))
             shutil.move(os.path.join(WEIGHTS_DIR, 'temp_'+ SAVE_WEIGHTS), os.path.join(WEIGHTS_DIR, SAVE_WEIGHTS))
+        
+            if test_average_loss.item()<min_loss:
+                torch.save(model.module.state_dict(), os.path.join(WEIGHTS_DIR, 'temp_'+ 'early_'+ SAVE_WEIGHTS))
+                shutil.move(os.path.join(WEIGHTS_DIR, 'temp_'+'early_'+ SAVE_WEIGHTS), os.path.join(WEIGHTS_DIR, 'early_'+ SAVE_WEIGHTS))
+                min_loss = test_average_loss.item()
+                print('Early stopping with loss', min_loss, 'at the epoch', epoch)
             print('weights saved')
     destroy_process_group()
 
