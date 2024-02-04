@@ -35,7 +35,7 @@ LR_WARMUP_EPOCHS = 5
 LR_DECAY_EPOCHS = 100
 
 # How many data samples to take from every data file
-DATA_SAMPLES = 1  #For ALL data set: None
+DATA_SAMPLES = 80  #For ALL data set: None
 BATCH_SIZE = 1
 SEQ_LENGTH = 100
 TEST_PART = 0.2
@@ -44,14 +44,26 @@ DEVICE_NUM = 2
 
 
 WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
-LOAD_WEIGHTS = 'renas3_last.pt'
-SAVE_WEIGHTS = 'renas3.pt'
+LOAD_WEIGHTS = 'renas3.1_env.pt'
+SAVE_WEIGHTS = 'renas3.1.pt'
 
 DATASET1 = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/real_pink_gates/sa-trajs_combined.h5'
 #DATASET2 = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/sa-trajs2023-11-08_14-31-15.h5'
 
 PROMPT1 = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/real_pink_gates/prompt.txt'
 #PROMPT2 = '/home/renas/pythonprogv2/phd_xiaor_project/sa-traj_dataset/sa-trajs2023-11-08_14-31-15_prompt.txt'   
+
+VELOCITY_PAIRS = np.array([
+        [0.5, 1],
+        [0.5, 0],
+        [0.5, -1],
+        [0, 1],
+        [0, 0],
+        [0, -1],
+        [-0.5, 1],
+        [-0.5, 0],
+        [-0.5, -1]
+    ])
 
 
 class PositionalEncoding(torch.nn.Module):
@@ -162,6 +174,7 @@ def ddp_setup(rank, world_size):
 
 
 def ddp_train_loop(rank, world_size, train_dataset, test_dataset):
+    print('here1')
     ddp_setup(rank, world_size)
     model = Renas(rank).to(rank)
     model = DDP(model, device_ids=[rank], find_unused_parameters=True)  
@@ -198,6 +211,7 @@ def ddp_train_loop(rank, world_size, train_dataset, test_dataset):
 
 
     epoch = 0
+    min_loss = 10000
     while True:
         epoch += 1
         total_loss = 0
@@ -235,7 +249,8 @@ def ddp_train_loop(rank, world_size, train_dataset, test_dataset):
                 del output, batch_action
                 test_total_loss += test_loss  
                 del test_loss
-            test_average_loss = test_total_loss/len(test_dataloader)   
+            torch.distributed.all_reduce(test_total_loss, op=torch.distributed.ReduceOp.SUM)
+            test_average_loss = test_total_loss/len(test_dataloader)/world_size   
             if rank==0:     
                 ten_board_writer.add_scalar('Test_Loss', test_average_loss.item(), epoch)
         epoch_train_time_end = time.time()
@@ -245,13 +260,19 @@ def ddp_train_loop(rank, world_size, train_dataset, test_dataset):
         if epoch % CHECKPOINT_INTERVAL == 0 and rank==0:
             torch.save(model.module.state_dict(), os.path.join(WEIGHTS_DIR, 'temp_'+ SAVE_WEIGHTS))
             shutil.move(os.path.join(WEIGHTS_DIR, 'temp_'+ SAVE_WEIGHTS), os.path.join(WEIGHTS_DIR, SAVE_WEIGHTS))
+
+            if test_average_loss.item()<min_loss:
+                torch.save(model.module.state_dict(), os.path.join(WEIGHTS_DIR, 'temp_'+ 'early_'+ SAVE_WEIGHTS))
+                shutil.move(os.path.join(WEIGHTS_DIR, 'temp_'+'early_'+ SAVE_WEIGHTS), os.path.join(WEIGHTS_DIR, 'early_'+ SAVE_WEIGHTS))
+                min_loss = test_average_loss.item()
+                print('Early stopping with loss', min_loss, 'at the epoch', epoch)
             print('weights saved')
     destroy_process_group()
 
 def actions_to_options(actions, velocity_pairs=None):
     '''Switch [batch_size, seq_length, 2] numpy actions to [batch_size, seq_length, 9] action options'''
     batch_size, seq_length, _ = actions.shape
-    if velocity_pairs == None:
+    if velocity_pairs is None:
         print('Velocity pairs are not defined. Standart teleop_twist_keyboard applied.')
         velocity_pairs = np.array([
             [0.5, 1],
@@ -285,11 +306,8 @@ if __name__ == '__main__':
     states_tensor1 = data_file1['states']['data'][:DATA_SAMPLES]
     states_tensor1 = torch.from_numpy(states_tensor1)
     actions_tensor1 = data_file1['actions']['data'][:DATA_SAMPLES]
-    print('here')
-    print(actions_tensor1)
-    actions_tensor1 = actions_to_options(actions_tensor1)
+    actions_tensor1 = actions_to_options(actions_tensor1, velocity_pairs=VELOCITY_PAIRS)
     actions_tensor1 = torch.from_numpy(actions_tensor1).float()
-    print(actions_tensor1)
     prompts1 = open(PROMPT1, 'r').read().splitlines()*states_tensor1.shape[0]
     
     #data_file2 = h5py.File(DATASET2, 'r')
@@ -304,20 +322,28 @@ if __name__ == '__main__':
     actions_tensor = actions_tensor1
     del actions_tensor1
     prompts = prompts1
-
-    train_states, test_states, train_actions, test_actions, train_prompts, test_prompts = train_test_split(
-        states_tensor, 
-        actions_tensor, prompts, 
-        test_size=TEST_PART)
+    
     print('state-action dataset size:')
     print(states_tensor.shape)
     print(actions_tensor.shape)
-    del states_tensor, actions_tensor, prompts
 
-    train_dataset = StateActionPromptDataset(train_states, train_actions, train_prompts)
-    test_dataset = StateActionPromptDataset(test_states, test_actions, test_prompts)
+    print('here0.0')
+    #states_tensor.share_memory_()
+    print('here0.1')
+    #actions_tensor.share_memory_()
 
-    #mp.spawn(ddp_train_loop,args=(world_size,train_dataset, test_dataset), nprocs=world_size, join=True)
+    #train_states, test_states, train_actions, test_actions, train_prompts, test_prompts = train_test_split(
+    #    states_tensor, 
+    #    actions_tensor, prompts, 
+    #    test_size=TEST_PART)
+    #del states_tensor, actions_tensor, prompts
+    #train_dataset = StateActionPromptDataset(train_states, train_actions, train_prompts)
+    #test_dataset = StateActionPromptDataset(test_states, test_actions, test_prompts)
+
+    dataset = StateActionPromptDataset(states_tensor, actions_tensor, prompts)
+    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [1-TEST_PART, TEST_PART])
+    print('here0')
+    mp.spawn(ddp_train_loop,args=(world_size,train_dataset, test_dataset), nprocs=world_size, join=True)
 
 
     
