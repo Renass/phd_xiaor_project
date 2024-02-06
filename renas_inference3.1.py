@@ -33,9 +33,9 @@ CMD_PUBLISH_TOPIC = '/cmd_vel'
 IMAGE_TOPIC = 'camera/rgb/image_raw'
 
 
-LOAD_WEIGHTS = '/home/renas/pythonprogv2/phd_xiaor_project/weights/renas3.pt'
+LOAD_WEIGHTS = '/home/renas/pythonprogv2/phd_xiaor_project/weights/renas3.1_pink_gates.pt'
 
-PROMPT = 'Move to the pink object'
+PROMPT = 'Go to the basketball ball' 
 
 VELOCITY_PAIRS = np.array([
         [0.5, 1],
@@ -52,7 +52,7 @@ VELOCITY_PAIRS = np.array([
 def actions_to_options(actions, velocity_pairs=None):
     '''Switch [batch_size, seq_length, 2] numpy actions to [batch_size, seq_length, 9] action options'''
     batch_size, seq_length, _ = actions.shape
-    if velocity_pairs == None:
+    if velocity_pairs is None:
         print('Velocity pairs are not defined. Standart teleop_twist_keyboard applied.')
         velocity_pairs = np.array([
             [0.5, 1],
@@ -99,7 +99,7 @@ def behav_clon_inference_thread():
                     start_time = time.time()
                     states = torch.stack(traj_buffer.states_buffer[-1], dim=0).unsqueeze(0)
                     actions = torch.tensor(traj_buffer.actions_buffer[-1]).unsqueeze(0)
-                    actions = torch.tensor(actions_to_options(actions.numpy())).float()
+                    actions = torch.tensor(actions_to_options(actions.numpy(), velocity_pairs=VELOCITY_PAIRS)).float()
                     if states.shape[1] == actions.shape[1]:
                         output = model.forward(states, actions, prompt=[PROMPT])
                         #print('cnn_output', cnn_output.shape)
