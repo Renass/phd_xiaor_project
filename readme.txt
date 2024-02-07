@@ -29,18 +29,32 @@ catkin_make
 
 
 Start-up: 
-(bash-based)
-For every node:
-cd ~/catkin_ws
-source ./devel/setup.bash
-Independent nodes:
-1. roslaunch mobile_manipulator_body base_gazebo_control.launch
-2. rviz -d ~/catkin_ws/src/mobile_manipulator_body/camera_view.rviz
-3. rosrun teleop_twist_keyboard teleop_twist_keyboard.py cmd_vel:=/robot_base_velocity_controller/cmd_vel
-4. python3 reset_env.py
-5. python3 reward_publisher.py
-6. python3 decision_transformer2.py
-7. start tensorboard by clicking the button in decision_transformer2.py import side
+1. Gazebo Virtual environment experiment:
+    (bash-based)
+    For every node:
+    cd ~/catkin_ws
+    source ./devel/setup.bash
+    Independent nodes:
+    1. roslaunch mobile_manipulator_body base_gazebo_control.launch
+    2. rviz -d ~/catkin_ws/src/mobile_manipulator_body/camera_view.rviz
+    3. rosrun teleop_twist_keyboard teleop_twist_keyboard.py cmd_vel:=/robot_base_velocity_controller/cmd_vel
+    4. python3 reset_env.py
+    5. python3 reward_publisher.py
+    6. python3 decision_transformer2.py
+    7. start tensorboard by clicking the button in decision_transformer2.py import side
+2. Real-world robot experiment:
+    0. export ROS_MASTER_URI=http://172.16.1.150:11311 -> ~/.bashrc
+    1. Turn on xrrobot (connect to network)
+    2. roscore
+    xrrobot connection: ssh xrrobot@172.16.1.152
+    3. xrrobot: roslaunch xrrobot bringup.launch
+    4.rosrun teleop_twist_keyboard teleop_twist_keyboard.py
+    5. xrrobot: roslaunch xrrobot camera.launch
+    6. rosrun rqt_image_view rqt_image_view
+    7. xrrobot: roslaunch xrrobot lidar_slam.launch
+    8. rviz -d ~/rviz/auto_slam.rviz
+
+
 
 watch -n 1 nvidia-smi
 tensorboard --logdir=/home/renas/pythonprogv2/phd_xiaor_project --port=6007
