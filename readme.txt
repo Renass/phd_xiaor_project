@@ -1,20 +1,15 @@
-Gazebo based robotic (Xiaor Geek) simulation project for Transformer experiments
 
-1. ~/catkin_ws/src/mobile_manipulator_body - ROS package
-2. ~/pythonprogv2/phd_xiaor_project - Python scripts source
-
-1.1. ./launch/base_gazebo_control.launch
-A file to start ga project's gazebo simulation 
-1.2. ./meshes 
-Visual robot represenations
-1.3. ./sdf
-sdf format additions to gazebo
-1.4. ./urdf/robot_base.urdf
-Robot description, logic models and plugins
+My phd AI project on (Xiaor Geek car) robotics  
+based on Multimodal Transformers (Natural-language, Computer vision, Lidar point cloud)
+* Environments: real-world robotics, GAZEBO simulation
 
 
+Repo:
+1. ~/catkin_ws/src/mobile_manipulator_body - ROS package of virtual GAZEBO simulation of robot (diff_drive with odom, camera, lidar(SLAM,amcl))
+2. ~/catkin_ws/src/xrrobot_project/xrrobot - ROS package of xrrobot (Xiaor Geek SLAM car)  
+3. ~/pythonprogv2/phd_xiaor_project - Python scripts source (this repo) 
 
-v30.01.2024
+v07.03.2024
 Ubuntu 20.04.6 LTS
 ROS noetic
 Python 3.8.10
@@ -41,7 +36,7 @@ Start-up:
     4. python3 reset_env.py
     5. python3 reward_publisher.py
     6. python3 decision_transformer2.py
-    7. start tensorboard by clicking the button in decision_transformer2.py import side
+    7. start tensorboard by clicking the button in import side
 2. Real-world robot experiment:
     0. export ROS_MASTER_URI=http://172.16.1.150:11311 -> ~/.bashrc
     1. Turn on xrrobot (connect to network)

@@ -26,13 +26,14 @@ BUFFER_SIZE = 1
 IM_RESOLUTION = (640, 480)
 SEQUENCE_LENGTH = 20
 
-CMD_PUBLISH_TOPIC = '/cmd_vel'
-#CMD_PUBLISH_TOPIC = 'robot_base_velocity_controller/cmd_vel'
+#CMD_PUBLISH_TOPIC = '/cmd_vel'
+CMD_PUBLISH_TOPIC = 'robot_base_velocity_controller/cmd_vel'
 
+IMAGE_TOPIC = '/image_raw'
 
-LOAD_WEIGHTS = '/home/renas/pythonprogv2/phd_xiaor_project/weights/renas3_pink_gates.pt'
+LOAD_WEIGHTS = '/home/renas/pythonprogv2/phd_xiaor_project/weights/renas3_last.pt'
 
-PROMPT = 'Go to the green target'
+PROMPT = 'Go to the cube'
 
 def publish_twist(publisher, a):
     twist_msg = Twist()
@@ -178,8 +179,8 @@ if __name__ == '__main__':
         im_preproc= False, 
         num_transitions=SEQUENCE_LENGTH, 
         always=True,
-        image_topic= '/camera/rgb/image_raw',
-        cmd_vel_topic= '/cmd_vel', 
+        image_topic= IMAGE_TOPIC,
+        cmd_vel_topic= CMD_PUBLISH_TOPIC, 
         reset_environment=False)
     
     driv_pub = rospy.Publisher(CMD_PUBLISH_TOPIC, Twist, queue_size=1)

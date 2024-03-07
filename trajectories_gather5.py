@@ -28,7 +28,7 @@ std, mean preprocess for pretrained models
 '''
 
 class TrajectoryBuffer:
-    def __init__(self, image_topic = '/image_raw', cmd_vel_topic = 'robot_base_velocity_controller/cmd_vel',buffer_size=10, im_resolution = (640,480), im_preproc = True, num_transitions=100, always=True, reset_environment=True):
+    def __init__(self, image_topic, cmd_vel_topic, buffer_size=10, im_resolution = (640,480), im_preproc = True, num_transitions=100, always=True, reset_environment=True):
         self.always = always
         self.num_transitions = num_transitions
         self.im_resolution = im_resolution

@@ -27,15 +27,15 @@ BUFFER_SIZE = 1
 IM_RESOLUTION = (640, 480)
 SEQUENCE_LENGTH = 20
 
-CMD_PUBLISH_TOPIC = '/cmd_vel'
-#CMD_PUBLISH_TOPIC = 'robot_base_velocity_controller/cmd_vel'
+#CMD_PUBLISH_TOPIC = '/cmd_vel'
+CMD_PUBLISH_TOPIC = 'robot_base_velocity_controller/cmd_vel'
 
-IMAGE_TOPIC = 'camera/rgb/image_raw'
+#IMAGE_TOPIC = 'camera/rgb/image_raw'
+IMAGE_TOPIC = '/image_raw'
 
+LOAD_WEIGHTS = '/home/renas/pythonprogv2/phd_xiaor_project/weights/renas3.1_env.pt'
 
-LOAD_WEIGHTS = '/home/renas/pythonprogv2/phd_xiaor_project/weights/renas3.1_pink_gates.pt'
-
-PROMPT = 'Go to the basketball ball' 
+PROMPT = 'Go to the ball' 
 
 VELOCITY_PAIRS = np.array([
         [0.5, 1],
