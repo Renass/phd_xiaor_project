@@ -34,7 +34,7 @@ def save_thread():
         os.makedirs(SAVE_DIR)
     current_datetime = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     save_filename = os.path.join(SAVE_DIR, f'tsa-trajs{current_datetime}.h5')
-
+    txt_filename = os.path.join(SAVE_DIR, f'tsa-trajs_{current_datetime}.txt')
 
 
     with h5py.File(save_filename, 'w') as hf:
@@ -50,7 +50,10 @@ def save_thread():
             action = np.stack(actions_trajectory, axis=0)
             actions_group.create_dataset('data_'+str(i), data=action, dtype = np.float32, compression = 'gzip')
 
-
+    with open(txt_filename, 'w') as txt_file:
+        for task in traj_buffer.task_buffer:
+            if 'new_task' in task:
+                txt_file.write(f'{task["new_task"]}\n')
     print('Buffer saved')
 
 if __name__ == '__main__':
