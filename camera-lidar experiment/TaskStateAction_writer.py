@@ -13,9 +13,10 @@ Write a Task-State-Action dataset as a HDF5 file with gzip
 imports: trajectories_gather6
 '''
 
-BUFFER_SIZE = 2
+BUFFER_SIZE = 1
 SAVE_DIR = 'TSA_dataset/nav'
 IMAGE_TOPIC = '/image_raw'
+MAP_SERVICE = '/dynamic_map'
 
 
 def rospy_thread():
@@ -41,6 +42,7 @@ def save_thread():
         # Create HDF5 datasets for states and actions
         states_group = hf.create_group('states')
         actions_group = hf.create_group('actions')
+        map_group = hf.create_group('maps')
 
         for i, states_trajectory in enumerate(traj_buffer.states_buffer):
             state = np.stack(states_trajectory, axis=0)
@@ -49,6 +51,10 @@ def save_thread():
         for i, actions_trajectory in enumerate(traj_buffer.actions_buffer):
             action = np.stack(actions_trajectory, axis=0)
             actions_group.create_dataset('data_'+str(i), data=action, dtype = np.float32, compression = 'gzip')
+
+        for i, maps_trajectory in enumerate(traj_buffer.map_buffer):
+            map = np.stack(maps_trajectory, axis=0)
+            map_group.create_dataset('data_'+str(i), data=map, dtype = np.float32, compression = 'gzip')
 
     with open(txt_filename, 'w') as txt_file:
         for task in traj_buffer.task_buffer:
@@ -59,6 +65,7 @@ def save_thread():
 if __name__ == '__main__':
     traj_buffer = trajectories_gather6.TrajectoryBuffer(
         image_topic= IMAGE_TOPIC,
+        map_service= MAP_SERVICE,
         buffer_size= BUFFER_SIZE,
         always= False
     )

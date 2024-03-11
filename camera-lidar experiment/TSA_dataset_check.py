@@ -7,9 +7,10 @@ import numpy as np
 
 '''
 Check one trajectory from dataset as a slide show
+camera_image - action slide show
 '''
 
-FILENAME = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/tsa-trajs2024-03-10_20-39-48.h5'
+FILENAME = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/tsa-trajs2024-03-11_20-05-25.h5'
 
 def update(frame):
     plt.clf()

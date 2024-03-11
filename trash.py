@@ -1,34 +1,23 @@
-import torch
-from torch.optim.lr_scheduler import SequentialLR, ConstantLR, ExponentialLR
-import matplotlib.pyplot as plt
+import rospy
+import tf
+from tf.transformations import euler_from_quaternion
 
-class Model(torch.nn.Module):
-    def __init__(self):
-        super(Model, self).__init__()
-        self.fc = torch.nn.Sequential(
-            torch.nn.Linear(1280*7*7, 768),
-            torch.nn.GELU(),
-            torch.nn.Linear(768, 768))
-        
-model = Model()
-model.train()
-optimizer = torch.optim.AdamW(model.parameters())
-scheduler1 = ConstantLR(optimizer, factor=0.1, total_iters=20)
-scheduler2 = ExponentialLR(optimizer, gamma=0.9)
-scheduler = SequentialLR(optimizer, schedulers=[scheduler1, scheduler2], milestones=[2])
+rospy.init_node('pose_extractor')
 
-learning_rates = []
-for epoch in range(100):
-    optimizer.step()
-    learning_rates.append(optimizer.param_groups[0]['lr'])
-    scheduler.step()
+listener = tf.TransformListener()
 
-# Plotting
-plt.figure(figsize=(10, 5))
-plt.plot(learning_rates, label='Learning Rate')
-plt.xlabel('Epochs')
-plt.ylabel('Learning Rate')
-plt.title('Combined Learning Rate Schedule')
-plt.legend()
-plt.grid(True)
-plt.show()
+rate = rospy.Rate(10.0)
+while not rospy.is_shutdown():
+    try:
+        # Look up the transformation from target frame to source frame
+        (trans, rot) = listener.lookupTransform('/map', '/base_link', rospy.Time(0))
+        print("Translation: ", trans)
+        print("Rotation (quaternion): ", rot)
+        roll, pitch, yaw = euler_from_quaternion(rot)
+        print("Roll: ", roll)
+        print("Pitch: ", pitch)
+        print("Yaw: ", yaw)
+    except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+        continue
+
+    rate.sleep()

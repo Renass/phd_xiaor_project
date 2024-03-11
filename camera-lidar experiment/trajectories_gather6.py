@@ -6,12 +6,13 @@ from diagnostic_msgs.msg import KeyValue
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import cv2
-from torchvision import transforms
 import numpy as np
+from nav_msgs.msg import OccupancyGrid
+from nav_msgs.srv import GetMap
 
 '''
 Node to gather sequences of:
-task state action
+task state:(camera_image, map) action
 
 
 
@@ -26,15 +27,17 @@ rostopic pub /task diagnostic_msgs/KeyValue "{key: 'end_task', value: 'done'}"
 
 
 class TrajectoryBuffer:
-    def __init__(self, image_topic, buffer_size, always=True):
+    def __init__(self, image_topic, map_service, buffer_size, always=True):
         self.waiting = 'task'
         self.always = always
         self.buffer_size = buffer_size
         self.task_buffer = deque([], maxlen=buffer_size*2)
         self.states_buffer = deque([[]], maxlen=buffer_size)
+        self.map_buffer = deque([[]], maxlen=buffer_size)
         self.actions_buffer = deque([[]], maxlen=buffer_size)
         rospy.init_node('traj_gather_node', anonymous=True)
         rospy.Subscriber(image_topic, Image, self.callback_image)
+        self.map_service = rospy.ServiceProxy(map_service, GetMap)
         self.status_subscriber = rospy.Subscriber('/move_base/status', GoalStatusArray, self.goal_status_callback)
         self.goal_subscriber = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)
         self.task_subscriber = rospy.Subscriber('/task', KeyValue, self.task_callback)
@@ -54,6 +57,7 @@ class TrajectoryBuffer:
             if self.always or len(self.states_buffer)< self.buffer_size:
                 self.states_buffer.append([])
                 self.actions_buffer.append([])
+                self.map_buffer.append([])
                 self.waiting = 'task'
 
 
@@ -99,10 +103,19 @@ class TrajectoryBuffer:
             #image = transforms.ToTensor()(image)
             image = np.array(image)
             self.states_buffer[-1].append(image)
+            
+            map = self.map_service().map
+            map = np.array(map.data, dtype=np.int8).reshape(map.info.height, map.info.width)
+            map[map == -1] = 0
+            self.map_buffer[-1].append(map)
             print('state_add')
 
 if __name__ == '__main__':
-    traj_buffer = TrajectoryBuffer(image_topic= '/image_raw', buffer_size=10)
+    traj_buffer = TrajectoryBuffer(
+        image_topic= '/image_raw',
+        map_service= '/dynamic_map',
+        always= True, 
+        buffer_size=10)
     while not rospy.is_shutdown():
         try:
             rospy.spin()
