@@ -24,7 +24,7 @@ catkin_make
 
 
 Start-up: 
-1. Gazebo Virtual environment experiment:
+1. Gazebo Virtual environment experiment (camera experiment):
     (bash-based)
     For every node:
     cd ~/catkin_ws
@@ -37,6 +37,7 @@ Start-up:
     5. python3 reward_publisher.py
     6. python3 decision_transformer2.py
     7. start tensorboard by clicking the button in import side
+
 2. Real-world robot experiment:
     0. export ROS_MASTER_URI=http://172.16.1.150:11311 -> ~/.bashrc
     1. Turn on xrrobot (connect to network)
@@ -49,6 +50,25 @@ Start-up:
     7. xrrobot: roslaunch xrrobot lidar_slam.launch
     8. rviz -d ~/rviz/auto_slam.rviz
 
+3. GAZEBO virtual env (camera-lidar experiment): 
+    1. Launch environment
+    * roslaunch mobile_manipulator_body 2A724_empty.launch
+    * roslaunch mobile_manipulator_body 2A724_m.launch
+    * roslaunch mobile_manipulator_body base_gazebo_control.launch
+    2. launch navigation (move_base) with obstacle map supply (amcl) or mapping (SLAM)
+    (SLAM + move_base): 
+    * roslaunch mobile_manipulator_body lidar_slam4.launch (SLAM + move_base)
+    (amcl + move_base):
+    * roslaunch mobile_manipulator_body navigate4.launch
+    * rosrun map_server map_server ./maps/2A724x3.yaml
+    3. (optional) keyboard control:
+    * rosrun teleop_twist_keyboard teleop_twist_keyboard.py cmd_vel:=/rob/cmd_vel
+    4. (optional) Map visualization:
+    * rviz -d ./amcl_navigate.rviz
+    * rviz -d ./navigate.rviz
+    5. (optional) camera view:
+    * rosrun rqt_image_view rqt_image_view
+    * rviz -d ./camera_view.rviz
 
 
 watch -n 1 nvidia-smi
