@@ -16,7 +16,8 @@ imports: trajectories_gather6
 BUFFER_SIZE = 1
 SAVE_DIR = 'TSA_dataset/nav'
 IMAGE_TOPIC = '/image_raw'
-MAP_SERVICE = '/dynamic_map'
+#MAP_SERVICE = '/dynamic_map'
+MAP_SERVICE = '/static_map'
 
 
 def rospy_thread():
@@ -35,7 +36,8 @@ def save_thread():
         os.makedirs(SAVE_DIR)
     current_datetime = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     save_filename = os.path.join(SAVE_DIR, f'tsa-trajs{current_datetime}.h5')
-    txt_filename = os.path.join(SAVE_DIR, f'tsa-trajs_{current_datetime}.txt')
+    txt_filename = os.path.join(SAVE_DIR, f'tsa-trajs_{current_datetime}_tasks.txt')
+    mapinfo_filename = os.path.join(SAVE_DIR, f'tsa-trajs_{current_datetime}_mapinfo.txt')
 
 
     with h5py.File(save_filename, 'w') as hf:
@@ -43,6 +45,7 @@ def save_thread():
         states_group = hf.create_group('states')
         actions_group = hf.create_group('actions')
         map_group = hf.create_group('maps')
+        pose_group = hf.create_group('pose')
 
         for i, states_trajectory in enumerate(traj_buffer.states_buffer):
             state = np.stack(states_trajectory, axis=0)
@@ -56,10 +59,19 @@ def save_thread():
             map = np.stack(maps_trajectory, axis=0)
             map_group.create_dataset('data_'+str(i), data=map, dtype = np.float32, compression = 'gzip')
 
+        for i, pose_trajectory in enumerate(traj_buffer.pose_buffer):
+            pose = np.stack(pose_trajectory, axis=0)
+            pose_group.create_dataset('data_'+str(i), data=pose, dtype = np.float32, compression = 'gzip')
+
     with open(txt_filename, 'w') as txt_file:
         for task in traj_buffer.task_buffer:
             if 'new_task' in task:
                 txt_file.write(f'{task["new_task"]}\n')
+
+
+    with open(mapinfo_filename, 'w') as txt_file:
+        print(traj_buffer.map_info, file=txt_file)
+    
     print('Buffer saved')
 
 if __name__ == '__main__':

@@ -9,10 +9,11 @@ import cv2
 import numpy as np
 from nav_msgs.msg import OccupancyGrid
 from nav_msgs.srv import GetMap
+import tf
 
 '''
 Node to gather sequences of:
-task state:(camera_image, map) action
+task state:(camera_image, map, pose) action
 
 
 
@@ -24,20 +25,27 @@ end task:
 rostopic pub /task diagnostic_msgs/KeyValue "{key: 'end_task', value: 'done'}"
 '''
 
-
+IMAGE_TOPIC = '/image_raw'
+#MAP_SERVICE = '/dynamic_map'
+MAP_SERVICE = '/static_map'
 
 class TrajectoryBuffer:
     def __init__(self, image_topic, map_service, buffer_size, always=True):
         self.waiting = 'task'
         self.always = always
         self.buffer_size = buffer_size
+
         self.task_buffer = deque([], maxlen=buffer_size*2)
         self.states_buffer = deque([[]], maxlen=buffer_size)
         self.map_buffer = deque([[]], maxlen=buffer_size)
         self.actions_buffer = deque([[]], maxlen=buffer_size)
+        self.pose_buffer = deque([[]], maxlen=buffer_size)
+        self.map_info = None
+
         rospy.init_node('traj_gather_node', anonymous=True)
         rospy.Subscriber(image_topic, Image, self.callback_image)
         self.map_service = rospy.ServiceProxy(map_service, GetMap)
+        self.pose_listener = tf.TransformListener()
         self.status_subscriber = rospy.Subscriber('/move_base/status', GoalStatusArray, self.goal_status_callback)
         self.goal_subscriber = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)
         self.task_subscriber = rospy.Subscriber('/task', KeyValue, self.task_callback)
@@ -58,6 +66,7 @@ class TrajectoryBuffer:
                 self.states_buffer.append([])
                 self.actions_buffer.append([])
                 self.map_buffer.append([])
+                self.pose_buffer.append([])
                 self.waiting = 'task'
 
 
@@ -105,15 +114,27 @@ class TrajectoryBuffer:
             self.states_buffer[-1].append(image)
             
             map = self.map_service().map
+            self.map_info = map.info
+            print(map.info)
             map = np.array(map.data, dtype=np.int8).reshape(map.info.height, map.info.width)
-            map[map == -1] = 0
+            map[map == -1] = 0.5
             self.map_buffer[-1].append(map)
+
+            (trans, rot) = self.pose_listener.lookupTransform('/map', '/base_link', rospy.Time(0))
+            pose = np.array([
+                trans[0],
+                trans[1],
+                rot[2],
+                rot[3]
+                ])
+            self.pose_buffer[-1].append(pose)
+            print(trans)
             print('state_add')
 
 if __name__ == '__main__':
     traj_buffer = TrajectoryBuffer(
-        image_topic= '/image_raw',
-        map_service= '/dynamic_map',
+        image_topic= IMAGE_TOPIC,
+        map_service= MAP_SERVICE,
         always= True, 
         buffer_size=10)
     while not rospy.is_shutdown():
