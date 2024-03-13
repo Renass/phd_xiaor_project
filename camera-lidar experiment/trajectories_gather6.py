@@ -13,11 +13,13 @@ import tf
 
 '''
 Node to gather sequences of:
-task state:(camera_image, map, pose) action
+{task, 
+state:(camera_image, map-costmap, pose), 
+action}
 
 
 
-waiting queue: 'task': ['state', 'action', 'status']
+waiting queue: 'task': ['state', 'state.costmap', 'action', 'status']
 
 new task:
 rostopic pub /task diagnostic_msgs/KeyValue "{key: 'new_task', value: 'go left'}"
@@ -38,6 +40,7 @@ class TrajectoryBuffer:
         self.task_buffer = deque([], maxlen=buffer_size*2)
         self.states_buffer = deque([[]], maxlen=buffer_size)
         self.map_buffer = deque([[]], maxlen=buffer_size)
+        self.costmap_buffer = deque([[]], maxlen=buffer_size)
         self.actions_buffer = deque([[]], maxlen=buffer_size)
         self.pose_buffer = deque([[]], maxlen=buffer_size)
         self.map_info = None
@@ -49,6 +52,7 @@ class TrajectoryBuffer:
         self.status_subscriber = rospy.Subscriber('/move_base/status', GoalStatusArray, self.goal_status_callback)
         self.goal_subscriber = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)
         self.task_subscriber = rospy.Subscriber('/task', KeyValue, self.task_callback)
+        self.global_costmap_subscriber = rospy.Subscriber("/move_base/global_costmap/costmap", OccupancyGrid, self.global_costmap_callback)
 
     def task_callback(self, task_msg):
         if self.waiting == 'task' and task_msg.key == 'new_task':
@@ -66,6 +70,7 @@ class TrajectoryBuffer:
                 self.states_buffer.append([])
                 self.actions_buffer.append([])
                 self.map_buffer.append([])
+                self.costmap_buffer.append([])
                 self.pose_buffer.append([])
                 self.waiting = 'task'
 
@@ -106,7 +111,7 @@ class TrajectoryBuffer:
 
     def callback_image(self, msg):
         if self.waiting == 'state':
-            self.waiting = 'action'
+            #self.waiting = 'state.costmap'
             image = CvBridge().imgmsg_to_cv2(msg, "bgr8")
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             #image = transforms.ToTensor()(image)
@@ -129,7 +134,7 @@ class TrajectoryBuffer:
                         'z' : map.info.origin.orientation.z,
                         'w' : map.info.origin.orientation.w}}}
             
-            
+            self.waiting = 'state.costmap'
             map = np.array(map.data, dtype=np.int8).reshape(map.info.height, map.info.width)
             map[map == -1] = 50
             self.map_buffer[-1].append(map)
@@ -142,7 +147,16 @@ class TrajectoryBuffer:
                 rot[3]
                 ])
             self.pose_buffer[-1].append(pose)
+            print('image add')
+
+    def global_costmap_callback(self, costmap_msg):
+        if self.waiting == 'state.costmap':
+            self.waiting = 'action'
+            costmap = np.array(costmap_msg.data, dtype=np.int8).reshape(self.map_info['height'], self.map_info['width'])
+            costmap[costmap == -1] = 50
+            self.costmap_buffer[-1].append(costmap)
             print('state_add')
+
 
 if __name__ == '__main__':
     traj_buffer = TrajectoryBuffer(

@@ -46,6 +46,7 @@ def save_thread():
         states_group = hf.create_group('states')
         actions_group = hf.create_group('actions')
         map_group = hf.create_group('maps')
+        costmap_group = hf.create_group('costmaps')
         pose_group = hf.create_group('pose')
 
         for i, states_trajectory in enumerate(traj_buffer.states_buffer):
@@ -59,6 +60,10 @@ def save_thread():
         for i, maps_trajectory in enumerate(traj_buffer.map_buffer):
             map = np.stack(maps_trajectory, axis=0)
             map_group.create_dataset('data_'+str(i), data=map, dtype = np.float32, compression = 'gzip')
+
+        for i, costmaps_trajectory in enumerate(traj_buffer.costmap_buffer):
+            costmap = np.stack(costmaps_trajectory, axis=0)
+            costmap_group.create_dataset('data_'+str(i), data=costmap, dtype = np.float32, compression = 'gzip')
 
         for i, pose_trajectory in enumerate(traj_buffer.pose_buffer):
             pose = np.stack(pose_trajectory, axis=0)

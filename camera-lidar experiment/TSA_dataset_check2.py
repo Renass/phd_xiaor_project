@@ -10,10 +10,10 @@ import json
 
 '''
 Check one trajectory from dataset as a slide show
-camera_image-map-action slide show
+camera_image-map(costmap)-action slide show
 '''
 
-FILENAME = 'TSA_dataset/nav/tsa-trajs_2024-03-13_18-44-02.h5'
+FILENAME = 'TSA_dataset/nav/tsa-trajs_2024-03-13_20-24-44.h5'
 
 def update(frame):
     ax1.clear()
@@ -24,8 +24,10 @@ def update(frame):
     ax1.set_title('Camera Image')
  
     ax2.imshow(np.flipud(maps[frame]), cmap='gray_r')
+    ax2.imshow(np.flipud(costmaps[frame]), cmap='gray_r', alpha=0.7) 
     ax2.axis('off')
     ax2.set_title('Map')
+
 
     map_pose = world_to_map(
         (pose[frame][0], pose[frame][1]), 
@@ -36,11 +38,11 @@ def update(frame):
     quaternion = [0, 0, pose[frame][2], pose[frame][3]]
     _, _, yaw = euler_from_quaternion(quaternion)
     yaw = -1*yaw
-    arrow_length = 300
+    arrow_length = 100
     dx = arrow_length * np.cos(yaw)
     dy = arrow_length * np.sin(yaw) 
     #arrow = Arrow(pose[frame][0], pose[frame][1], dx, dy, width=300, color='red')
-    arrow = Arrow(map_pose[0], map_pose[1], dx, dy, width=300, color='red')
+    arrow = Arrow(map_pose[0], map_pose[1], dx, dy, width=100, color='red')
     ax2.add_patch(arrow)
     
     new_action_text = f'Action: {actions[frame]}' if frame < len(actions) else 'Final State'
@@ -65,7 +67,7 @@ with h5py.File(FILENAME, 'r') as file:
     im = file['states']['data_0'][:]
     actions = file['actions']['data_0'][:]
     maps = file['maps']['data_0'][:]
-    print(np.max(maps[0]))
+    costmaps = file['costmaps']['data_0'][:]
     pose = file['pose']['data_0'][:]
 
 if im.dtype == np.float32 or im.dtype == np.float64:
