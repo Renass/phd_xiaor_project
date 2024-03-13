@@ -6,15 +6,14 @@ import matplotlib.animation as animation
 import numpy as np
 from matplotlib.patches import Arrow
 from tf.transformations import euler_from_quaternion
+import json
 
 '''
 Check one trajectory from dataset as a slide show
 camera_image-map-action slide show
-
-warning: map_info manually used in this code. Map info should be parsed.
 '''
 
-FILENAME = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/tsa-trajs2024-03-12_20-53-51.h5'
+FILENAME = 'TSA_dataset/nav/tsa-trajs_2024-03-13_18-44-02.h5'
 
 def update(frame):
     ax1.clear()
@@ -24,11 +23,16 @@ def update(frame):
     ax1.axis('off')
     ax1.set_title('Camera Image')
  
-    ax2.imshow(np.flipud(maps[frame]), cmap='gray')
+    ax2.imshow(np.flipud(maps[frame]), cmap='gray_r')
     ax2.axis('off')
     ax2.set_title('Map')
 
-    map_pose = world_to_map((pose[frame][0], pose[frame][1]), 0.05, (-150, -150))
+    map_pose = world_to_map(
+        (pose[frame][0], pose[frame][1]), 
+        mapinfo['resolution'], 
+        (mapinfo['origin']['position']['x'], 
+        mapinfo['origin']['position']['y'])
+    )
     quaternion = [0, 0, pose[frame][2], pose[frame][3]]
     _, _, yaw = euler_from_quaternion(quaternion)
     yaw = -1*yaw
@@ -52,7 +56,7 @@ def world_to_map(pose, resolution, origin):
     :return: The pose in map pixel coordinates.
     """
     map_x =  int((pose[0] - origin[0]) / resolution)
-    map_y = 5952 - int((pose[1] - origin[1]) / resolution)
+    map_y = mapinfo['height'] - int((pose[1] - origin[1]) / resolution)
     return (map_x, map_y)
 
 
@@ -61,12 +65,18 @@ with h5py.File(FILENAME, 'r') as file:
     im = file['states']['data_0'][:]
     actions = file['actions']['data_0'][:]
     maps = file['maps']['data_0'][:]
+    print(np.max(maps[0]))
     pose = file['pose']['data_0'][:]
 
 if im.dtype == np.float32 or im.dtype == np.float64:
     im = (im - im.min()) / (im.max() - im.min())
 
+mapinfo_filename = f"{os.path.splitext(FILENAME)[0]}_mapinfo.json"
+with open(mapinfo_filename, 'r') as file:
+    mapinfo = json.load(file)
+
+
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
 action_text = fig.text(0.5, 0.05, '', ha='center', va='center', fontsize=12, color='red')
-ani = animation.FuncAnimation(fig, update, frames= len(im), repeat=False, interval=9000)
+ani = animation.FuncAnimation(fig, update, frames= len(im), repeat=False, interval=5000)
 plt.show()

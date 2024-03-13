@@ -114,10 +114,24 @@ class TrajectoryBuffer:
             self.states_buffer[-1].append(image)
             
             map = self.map_service().map
-            self.map_info = map.info
-            print(map.info)
+            self.map_info = {
+                'resolution' : map.info.resolution,
+                'width' : map.info.width,
+                'height' : map.info.height,
+                'origin' : {
+                    'position' : {
+                        'x' : map.info.origin.position.x,
+                        'y' : map.info.origin.position.y,
+                        'z' : map.info.origin.position.z },
+                    'orientation' : {
+                        'x' : map.info.origin.orientation.x,
+                        'y' : map.info.origin.orientation.y,
+                        'z' : map.info.origin.orientation.z,
+                        'w' : map.info.origin.orientation.w}}}
+            
+            
             map = np.array(map.data, dtype=np.int8).reshape(map.info.height, map.info.width)
-            map[map == -1] = 0.5
+            map[map == -1] = 50
             self.map_buffer[-1].append(map)
 
             (trans, rot) = self.pose_listener.lookupTransform('/map', '/base_link', rospy.Time(0))
@@ -128,7 +142,6 @@ class TrajectoryBuffer:
                 rot[3]
                 ])
             self.pose_buffer[-1].append(pose)
-            print(trans)
             print('state_add')
 
 if __name__ == '__main__':

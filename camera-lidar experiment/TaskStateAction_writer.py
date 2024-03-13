@@ -6,6 +6,7 @@ import h5py
 import numpy as np 
 import threading
 import time
+import json
 
 '''
 Write a Task-State-Action dataset as a HDF5 file with gzip 
@@ -35,9 +36,9 @@ def save_thread():
     if not os.path.exists(SAVE_DIR):
         os.makedirs(SAVE_DIR)
     current_datetime = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    save_filename = os.path.join(SAVE_DIR, f'tsa-trajs{current_datetime}.h5')
+    save_filename = os.path.join(SAVE_DIR, f'tsa-trajs_{current_datetime}.h5')
     txt_filename = os.path.join(SAVE_DIR, f'tsa-trajs_{current_datetime}_tasks.txt')
-    mapinfo_filename = os.path.join(SAVE_DIR, f'tsa-trajs_{current_datetime}_mapinfo.txt')
+    mapinfo_filename = os.path.join(SAVE_DIR, f'tsa-trajs_{current_datetime}_mapinfo.json')
 
 
     with h5py.File(save_filename, 'w') as hf:
@@ -70,7 +71,8 @@ def save_thread():
 
 
     with open(mapinfo_filename, 'w') as txt_file:
-        print(traj_buffer.map_info, file=txt_file)
+        json.dump(traj_buffer.map_info, txt_file, indent=4)
+        #print(traj_buffer.map_info, file=txt_file)
     
     print('Buffer saved')
 
