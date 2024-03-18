@@ -16,9 +16,10 @@ imports: trajectories_gather6
 
 BUFFER_SIZE = 1
 SAVE_DIR = 'TSA_dataset/nav'
-IMAGE_TOPIC = '/image_raw'
-#MAP_SERVICE = '/dynamic_map'
-MAP_SERVICE = '/static_map'
+IMAGE_TOPIC = '/camera/rgb/image_raw'
+#IMAGE_TOPIC = '/image_raw'
+MAP_SERVICE = '/dynamic_map'
+#MAP_SERVICE = '/static_map'
 
 
 def rospy_thread():

@@ -47,8 +47,16 @@ Start-up:
     4.rosrun teleop_twist_keyboard teleop_twist_keyboard.py
     5. xrrobot: roslaunch xrrobot camera.launch
     6. rosrun rqt_image_view rqt_image_view
-    7. xrrobot: roslaunch xrrobot lidar_slam.launch
-    8. rviz -d ~/rviz/auto_slam.rviz
+    7. launch navigation (move_base) with obstacle map supply (amcl) or mapping (SLAM)
+    (SLAM + move_base): 
+    * roslaunch xrrobot lidar_slam4.launch (SLAM + move_base)
+    (amcl + move_base):
+    * roslaunch xrrobot navigate4.launch
+    * rosrun map_server map_server ./maps/2A724x3.yaml
+
+    8. rviz -d ./navigate.rviz
+
+    rosservice call /start_motor "{}" - Lidar service (sometimes helps when Lidar not publishing)
 
 3. GAZEBO virtual env (camera-lidar experiment): 
     1. Launch environment
@@ -69,6 +77,10 @@ Start-up:
     5. (optional) camera view:
     * rosrun rqt_image_view rqt_image_view
     * rviz -d ./camera_view.rviz
+
+
+
+
 
 
 watch -n 1 nvidia-smi

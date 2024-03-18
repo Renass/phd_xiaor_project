@@ -80,5 +80,5 @@ with open(mapinfo_filename, 'r') as file:
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
 action_text = fig.text(0.5, 0.05, '', ha='center', va='center', fontsize=12, color='red')
-ani = animation.FuncAnimation(fig, update, frames= len(im), repeat=False, interval=5000)
+ani = animation.FuncAnimation(fig, update, frames= len(im), repeat=False, interval=9000)
 plt.show()
