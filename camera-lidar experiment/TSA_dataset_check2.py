@@ -13,7 +13,7 @@ Check one trajectory from dataset as a slide show
 camera_image-map(costmap)-action slide show
 '''
 
-FILENAME = 'TSA_dataset/nav/tsa-trajs_2024-03-13_20-24-44.h5'
+FILENAME = 'TSA_dataset/nav/tsa-trajs_2024-03-19_15-09-09.h5'
 
 def update(frame):
     ax1.clear()

@@ -12,14 +12,28 @@ import json
 Write a Task-State-Action dataset as a HDF5 file with gzip 
 
 imports: trajectories_gather6
+
+Node to gather sequences of:
+{task, 
+state:(camera_image, map-costmap, pose), 
+action}
+
+
+
+waiting queue: 'task': ['state', 'state.costmap', 'action', 'status']
+
+new task:
+rostopic pub /task diagnostic_msgs/KeyValue "{key: 'new_task', value: 'go left'}"
+end task:
+rostopic pub /task diagnostic_msgs/KeyValue "{key: 'end_task', value: 'done'}"
 '''
 
 BUFFER_SIZE = 1
 SAVE_DIR = 'TSA_dataset/nav'
 IMAGE_TOPIC = '/camera/rgb/image_raw'
 #IMAGE_TOPIC = '/image_raw'
-MAP_SERVICE = '/dynamic_map'
-#MAP_SERVICE = '/static_map'
+#MAP_SERVICE = '/dynamic_map'
+MAP_SERVICE = '/static_map'
 
 
 def rospy_thread():
