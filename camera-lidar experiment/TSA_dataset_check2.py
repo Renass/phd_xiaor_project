@@ -6,6 +6,8 @@ import matplotlib.animation as animation
 import numpy as np
 from matplotlib.patches import Arrow
 from tf.transformations import euler_from_quaternion
+#from transforms3d.euler import euler_from_quaternion
+
 import json
 
 '''
