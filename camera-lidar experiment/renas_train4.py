@@ -13,6 +13,8 @@ from torch.utils.tensorboard import SummaryWriter
 import time
 from transformers import ViltProcessor, ViltModel, ViltImageProcessor
 from torch.nn.utils.rnn import pad_sequence
+import math
+from transformers import OpenAIGPTConfig, OpenAIGPTModel
 
 '''
 Behavioral cloning Renas  transformer camera-lidar TRAIN LOOP
@@ -39,6 +41,29 @@ BATCH_SIZE = 2
 WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
 LOAD_WEIGHTS = 'renas4.pt'
 SAVE_WEIGHTS = 'renas4.pt'
+
+class PositionalEncoding(torch.nn.Module):
+    def __init__(self, d_model, dropout=0.1, max_len=5000):
+        super(PositionalEncoding, self).__init__()
+        self.dropout = torch.nn.Dropout(p=dropout)
+
+        position = torch.arange(max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model))
+        pe = torch.zeros(max_len, 1, d_model)
+        pe[:, 0, 0::2] = torch.sin(position * div_term)
+        pe[:, 0, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        x = x + self.pe[:x.size(0)]
+        return self.dropout(x)
+    
+class EncodingVector(torch.nn.Module):
+    def __init__(self, d_model):
+        super(EncodingVector, self).__init__()
+        self.modality_vector = torch.nn.Parameter(torch.randn(d_model))
+    def forward(self, x):
+        return x + self.modality_vector.unsqueeze(0).unsqueeze(0)
 
 class StateActionPromptDataset(Dataset):
     def __init__(self, im, map, costmap, mapinfo, pose, action, prompt):
@@ -84,34 +109,84 @@ class Renas(torch.nn.Module):
         for param in self.vilt_model.parameters():
             param.requires_grad = True
 
+        self.mid_transformer = torch.nn.TransformerEncoder(
+             torch.nn.TransformerEncoderLayer(d_model=self.d_model, nhead=8),
+             num_layers=4
+        )
+        
+
+        self.pos_enc = PositionalEncoding(d_model=self.d_model)
+        self.states_enc_vector = EncodingVector(d_model=self.d_model)
+        self.actions_enc_vector = EncodingVector(d_model=self.d_model)
+
+        self.map2token = torch.nn.Linear(4096, self.d_model) 
         self.mapinfo2token = torch.nn.Linear(10, self.d_model)
         self.pose2token = torch.nn.Linear(4, self.d_model)
+        self.action2token = torch.nn.Linear(4, self.d_model)
+
+
+        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=4, n_head=12)
+        self.gpt_model = OpenAIGPTModel(self.gpt_config)
+
+        self.fc2 = torch.nn.Linear(768, 9)
 
 
     def forward(self, batch):
         im, map, costmap, mapinfo, pose, action, prompt = batch
         i1, i2, i3, i4, i5 = im.size()
         im = im.view(i1*i2, i3, i4, i5)
-        #im = torch.clamp(im, 0, 1)
-        #im = im.float()
+
         prompt = [prompt for prompt in prompt for _ in range(i2)]
 
 
         im_prompt = self.processor(images=im, text=prompt, return_tensors="pt", padding=True).to(self.device)
-        im_prompt = self.vilt_model(**im_prompt).pooler_output
+        im_prompt = self.vilt_model(**im_prompt).pooler_output.unsqueeze(1)
         
         map = map.unsqueeze(2).repeat(1, 1, 3, 1, 1)
+        m1, m2, m3, m4, m5 = map.size()
+        map = map.view(m1*m2, m3, m4, m5)
+        map = self.map_processor(images=map, return_tensors="pt", padding=True)['pixel_values'].to(self.device)
+        map = map[:, 0, :, :]
+        map_patch_size = 64
+        map = map.unfold(1, map_patch_size, map_patch_size).unfold(2, map_patch_size, map_patch_size)
+        map = map.contiguous().view(m1*m2, 6 * 6, map_patch_size * map_patch_size)
+        map = self.map2token(map)
+        map = self.pos_enc(map)
+
+        costmap = costmap.unsqueeze(2).repeat(1, 1, 3, 1, 1)
+        costmap = costmap.view(m1*m2, m3, m4, m5)
+        costmap = self.map_processor(images=costmap, return_tensors="pt", padding=True)['pixel_values'].to(self.device)
+        costmap = costmap[:, 0, :, :]
+        costmap = costmap.unfold(1, map_patch_size, map_patch_size).unfold(2, map_patch_size, map_patch_size)
+        costmap = costmap.contiguous().view(m1*m2, 6 * 6, map_patch_size * map_patch_size)
+        costmap = self.map2token(costmap)
+        costmap = self.pos_enc(costmap)
+
+        mapinfo = self.mapinfo2token(mapinfo.to(self.device)).unsqueeze(1).repeat(m2, 1, 1)
+        
+        pose = self.pose2token(pose.to(self.device)).view(m1*m2, -1).unsqueeze(1)
+
+        tokens = torch.cat((im_prompt, map, costmap, mapinfo, pose), dim=1)
+
+
+        states = self.mid_transformer(tokens)[:,0,:].view(i1,i2, -1)
+        actions = self.action2token(action.to(self.device))
+        
+        states = self.states_enc_vector(states)
+        actions = self.actions_enc_vector(actions)
+
+        states = self.pos_enc(states)
+        actions = self.pos_enc(actions)
+        #tokens = torch.cat((states_tensor, actions_tensor), dim=1)
+        tokens = torch.zeros(i1, i2*2, self.d_model, device=self.device)
+        tokens[:, 0::2, :] = states
+        tokens[:, 1::2, :] = actions
+
         print('here')
-        print(map.shape)
-        # batch_size and seq_length should be clamped as for image
-        map = self.map_processor(images=map, return_tensors="pt", padding=True).to(self.device)
-        costmap = self.map_processor(images=costmap, return_tensors="pt", padding=True).to(self.device)
-
-
-        mapinfo = self.mapinfo2token(mapinfo.to(self.device))
-        pose = self.pose2token(pose.to(self.device))
-        print(map.shape)
-
+        tokens = self.gpt_model(inputs_embeds = tokens).last_hidden_state
+        tokens = self.fc2(tokens[:, 0::2, :])
+        #solve that action shorter than state in a single sequence        
+        return tokens
 
 
 
@@ -214,7 +289,7 @@ if __name__ == '__main__':
             pose.append(torch.from_numpy(pose_group[pose_episode][:]))
         for i, action_episode in enumerate(action_group):
             action.append(torch.from_numpy(action_group[action_episode][:]))
-    print(torch.max(map[0][0]))
+
     mapinfo_filename = f"{os.path.splitext(DATASET)[0]}_mapinfo.json"
     with open(mapinfo_filename, 'r') as file:
         mapinfo = json.load(file)
