@@ -15,6 +15,7 @@ from transformers import ViltProcessor, ViltModel, ViltImageProcessor
 from torch.nn.utils.rnn import pad_sequence
 import math
 from transformers import OpenAIGPTConfig, OpenAIGPTModel
+import shutil
 
 '''
 Behavioral cloning Renas  transformer camera-lidar TRAIN LOOP
@@ -35,8 +36,9 @@ LR_DECAY_EPOCHS = 100
 
 DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/tsa-trajs_2024-03-19_15-09-09.h5'
 TEST_PART = 0.2
+CHECKPOINT_INTERVAL = 10
 DEVICE_NUM = 2
-BATCH_SIZE = 2
+BATCH_SIZE = 10
 
 WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
 LOAD_WEIGHTS = 'renas4.pt'
@@ -128,7 +130,7 @@ class Renas(torch.nn.Module):
         self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=4, n_head=12)
         self.gpt_model = OpenAIGPTModel(self.gpt_config)
 
-        self.fc2 = torch.nn.Linear(768, 9)
+        self.fc2 = torch.nn.Linear(self.d_model, 4)
 
 
     def forward(self, batch):
@@ -170,6 +172,10 @@ class Renas(torch.nn.Module):
 
 
         states = self.mid_transformer(tokens)[:,0,:].view(i1,i2, -1)
+        
+        #print(states.shape)
+        #print(action.shape)
+
         actions = self.action2token(action.to(self.device))
         
         states = self.states_enc_vector(states)
@@ -182,10 +188,10 @@ class Renas(torch.nn.Module):
         tokens[:, 0::2, :] = states
         tokens[:, 1::2, :] = actions
 
-        print('here')
         tokens = self.gpt_model(inputs_embeds = tokens).last_hidden_state
+        #print(tokens.shape)
         tokens = self.fc2(tokens[:, 0::2, :])
-        #solve that action shorter than state in a single sequence        
+        #print(tokens.shape)        
         return tokens
 
 
@@ -226,7 +232,7 @@ def ddp_train_loop(rank, world_size, train_dataset, test_dataset):
     scheduler2 = CosineAnnealingLR(optimizer, T_max=LR_DECAY_EPOCHS, eta_min= LR/10)
     scheduler3 = ConstantLR(optimizer, factor=LR/10, total_iters= 100000)
     scheduler = SequentialLR(optimizer, schedulers=[scheduler1, scheduler2, scheduler3], milestones=[LR_WARMUP_EPOCHS, LR_WARMUP_EPOCHS+LR_DECAY_EPOCHS])
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = torch.nn.MSELoss()
 
     if rank == 0:
         ten_board_writer = SummaryWriter()
@@ -253,9 +259,42 @@ def ddp_train_loop(rank, world_size, train_dataset, test_dataset):
         optimizer.zero_grad()
         for batch in train_dataloader:
             output = model(batch)
-            #print(type(batch[0]))
-    
-            print('success')
+            loss = criterion(output, batch[5].to(rank))
+            total_loss += loss
+            loss.backward()
+        optimizer.step()
+        scheduler.step()
+        average_loss = total_loss/len(train_dataloader)
+        if rank==0:
+            ten_board_writer.add_scalar('Loss', average_loss.item(), epoch)
+            print('\nEpoch: ', epoch,"  Training Loss:", average_loss.item())
+
+        with torch.no_grad():
+            for batch in test_dataloader:
+                output = model(batch)
+                test_loss = criterion(output, batch[5].to(rank))
+                test_total_loss += test_loss
+            
+            torch.distributed.all_reduce(test_total_loss, op=torch.distributed.ReduceOp.SUM)
+            test_average_loss = test_total_loss/len(test_dataloader)/world_size   
+            if rank==0:     
+                ten_board_writer.add_scalar('Test_Loss', test_average_loss.item(), epoch)
+        epoch_train_time_end = time.time()
+        print('Epoch train time: ',epoch_train_time_end-epoch_train_time_start)
+
+
+        if epoch % CHECKPOINT_INTERVAL == 0 and rank==0:
+            torch.save(model.module.state_dict(), os.path.join(WEIGHTS_DIR, 'temp_'+ SAVE_WEIGHTS))
+            shutil.move(os.path.join(WEIGHTS_DIR, 'temp_'+ SAVE_WEIGHTS), os.path.join(WEIGHTS_DIR, SAVE_WEIGHTS))
+
+            if test_average_loss.item()<min_loss:
+                torch.save(model.module.state_dict(), os.path.join(WEIGHTS_DIR, 'temp_'+ 'early_'+ SAVE_WEIGHTS))
+                shutil.move(os.path.join(WEIGHTS_DIR, 'temp_'+'early_'+ SAVE_WEIGHTS), os.path.join(WEIGHTS_DIR, 'early_'+ SAVE_WEIGHTS))
+                min_loss = test_average_loss.item()
+                print('Early stopping with loss', min_loss, 'at the epoch', epoch)
+            print('weights saved')
+    destroy_process_group()
+
 
 if __name__ == '__main__':
 
@@ -288,7 +327,8 @@ if __name__ == '__main__':
         for i, pose_episode in enumerate(pose_group):
             pose.append(torch.from_numpy(pose_group[pose_episode][:]))
         for i, action_episode in enumerate(action_group):
-            action.append(torch.from_numpy(action_group[action_episode][:]))
+            a = torch.from_numpy(action_group[action_episode][:])
+            action.append(torch.cat((a, torch.zeros((1,4))), dim=0))
 
     mapinfo_filename = f"{os.path.splitext(DATASET)[0]}_mapinfo.json"
     with open(mapinfo_filename, 'r') as file:
