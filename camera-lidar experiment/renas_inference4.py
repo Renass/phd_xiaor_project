@@ -47,8 +47,13 @@ def behav_clon_inference_thread():
             print('here')
             #Following data collection on writer program and
             #following data preprocessing on renas_train4.py
-            im = np.stack(traj_buffer.states_buffer[-1], axis=0).float()/255.0 
-            action = np.stack(traj_buffer.actions_buffer[-1], axis=0)
+            im = torch.from_numpy(np.stack(traj_buffer.states_buffer[-1], axis=0)).float()/255.0 
+            if len(traj_buffer.actions_buffer[-1])>0:
+                print('actions >0')
+                action = torch.from_numpy(np.stack(traj_buffer.actions_buffer[-1], axis=0))
+            else:
+                print('actions<0')
+            print(action.shape)
 
             print('one_move time :', time.time() - start_time)
             time.sleep(1)
