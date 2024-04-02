@@ -20,14 +20,13 @@ import shutil
 '''
 Behavioral cloning Renas  transformer camera-lidar TRAIN LOOP
 
-Actions in ros: position(x,y) orientation quternions (z, w)
-Actions for transformer: position (x,y), orinetation (yaw), (final_state)  
-
 State: im, map, costmap, pose, mapinfo, prompt
 
-1. TEXT-Image encoding using ViLT (trainable) (modality encoding)
-2. Text-Image cls tokens and action tokens (positional-encoding?) (modality-encoding?) 
-3. (Text-Image)-(action) causal Transformer GPT 
+Actions in ros: position(x,y) orientation quternions (z, w)
+
+1. TEXT-Image encoding using ViLT (trainable) 
+2. >Text-Image token + lidar map, costmap, pose self-attention transformer 
+3. (State)-(action) causal Transformer GPT 
 '''
 
 LR = 10e-5
