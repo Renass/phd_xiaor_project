@@ -27,6 +27,8 @@ end task:
 rostopic pub /task diagnostic_msgs/KeyValue "{key: 'end_task', value: 'done'}"
 '''
 
+
+
 IMAGE_TOPIC = '/image_raw'
 #MAP_SERVICE = '/dynamic_map'
 MAP_SERVICE = '/static_map'

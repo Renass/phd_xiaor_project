@@ -68,7 +68,8 @@ Start-up:
     * roslaunch mobile_manipulator_body lidar_slam4.launch (SLAM + move_base)
     (amcl + move_base):
     * roslaunch mobile_manipulator_body navigate4.launch
-    * rosrun map_server map_server ./maps/2A724x3.yaml
+    ** roscd mobile_manipulator_body
+    ** rosrun map_server map_server ./maps/2A724x3.yaml
     3. (optional) keyboard control:
     * rosrun teleop_twist_keyboard teleop_twist_keyboard.py cmd_vel:=/rob/cmd_vel
     4. (optional) Map visualization:
