@@ -19,8 +19,9 @@ Actions in ros: position(x,y) orientation quternions (z, w)
 3. (State)-(action) causal Transformer GPT 
 '''
 
+IMAGE_TOPIC = '/camera/rgb/image_raw'
+#IMAGE_TOPIC = '/image_raw'
 
-IMAGE_TOPIC = '/image_raw'
 LOAD_WEIGHTS = '/home/renas/pythonprogv2/phd_xiaor_project/weights/renas4.pt'
 
 #For SLAM:

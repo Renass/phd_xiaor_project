@@ -153,12 +153,11 @@ class TrajectoryBuffer:
 
     def global_costmap_callback(self, costmap_msg):
         if self.waiting == 'state.costmap':
-            self.waiting = 'action'
             costmap = np.array(costmap_msg.data, dtype=np.int8).reshape(self.map_info['height'], self.map_info['width'])
             costmap[costmap == -1] = 50
             self.costmap_buffer[-1].append(costmap)
             print('state_add')
-
+            self.waiting = 'action'
 
 if __name__ == '__main__':
     traj_buffer = TrajectoryBuffer(

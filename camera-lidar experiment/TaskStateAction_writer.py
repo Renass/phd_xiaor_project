@@ -29,7 +29,8 @@ rostopic pub /task diagnostic_msgs/KeyValue "{key: 'end_task', value: 'done'}"
 '''
 
 BUFFER_SIZE = 1
-SAVE_DIR = 'TSA_dataset/nav'
+SAVE_DIR = 'TSA_dataset/nav/check_robot'
+
 IMAGE_TOPIC = '/camera/rgb/image_raw'
 #IMAGE_TOPIC = '/image_raw'
 

@@ -52,7 +52,7 @@ Start-up:
     * roslaunch xrrobot lidar_slam4.launch (SLAM + move_base)
     (amcl + move_base):
     * roslaunch xrrobot navigate4.launch
-    * rosrun map_server map_server ./maps/2A724x3.yaml
+    * rosrun map_server map_server ./maps/2A724new.yaml
 
     8. rviz -d ./navigate.rviz
 
