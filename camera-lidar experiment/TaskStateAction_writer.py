@@ -32,6 +32,7 @@ BUFFER_SIZE = 1
 SAVE_DIR = 'TSA_dataset/nav'
 IMAGE_TOPIC = '/camera/rgb/image_raw'
 #IMAGE_TOPIC = '/image_raw'
+
 #MAP_SERVICE = '/dynamic_map'
 MAP_SERVICE = '/static_map'
 

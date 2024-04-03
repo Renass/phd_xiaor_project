@@ -1,10 +1,11 @@
-from renas_train4 import Renas
+from renas_train4 import Renas, StateActionPromptDataset
 import torch
 import trajectories_gather6
 import threading
 import rospy
 import time
 import numpy as np
+from geometry_msgs.msg import PoseStamped
 
 '''
 Behavioral cloning Renas  transformer camera-lidar INFERENCE
@@ -27,7 +28,9 @@ LOAD_WEIGHTS = '/home/renas/pythonprogv2/phd_xiaor_project/weights/renas4.pt'
 #For AMCL:
 MAP_SERVICE = '/static_map'
 
+#whatever the size is - the only current episode would be predicted action
 BUFFER_SIZE = 1
+ACTION_ROSTOPIC = '/move_base_simple/goal'
 
 
 def rospy_thread():
@@ -37,24 +40,61 @@ def rospy_thread():
         except:
             pass
 
+def publish_pose(publisher, action):
+    goal_msg = PoseStamped()
+    goal_msg.header.frame_id = 'map'
+    goal_msg.pose.position.x = action[0]
+    goal_msg.pose.position.y = action[1]
+    goal_msg.pose.position.z = 0
+
+    goal_msg.pose.orientation.x = 0
+    goal_msg.pose.orientation.y = 0
+    goal_msg.pose.orientation.z = action[2]
+    goal_msg.pose.orientation.w = action[3]
+
+    publisher.publish(goal_msg)
+
 def behav_clon_inference_thread():
     while not rospy.is_shutdown():
-        #print('inference step starts')
-        #while True:
-            #time.sleep(1)
         if traj_buffer.waiting == 'action':
             start_time = time.time()
-            print('here')
-            #Following data collection on writer program and
-            #following data preprocessing on renas_train4.py
-            im = torch.from_numpy(np.stack(traj_buffer.states_buffer[-1], axis=0)).float()/255.0 
+            im = (torch.from_numpy(np.stack(traj_buffer.states_buffer[-1], axis=0))/255.0).type(torch.float32).unsqueeze(0) 
+            map = (torch.from_numpy(np.stack(traj_buffer.map_buffer[-1], axis=0))/100.0).type(torch.float32).unsqueeze(0)
+            costmap = (torch.from_numpy(np.stack(traj_buffer.costmap_buffer[-1], axis=0))/100.0).type(torch.float32).unsqueeze(0)
+            mapinfo = traj_buffer.map_info
+            mapinfo = torch.tensor([
+                mapinfo['resolution'],
+                mapinfo['width'],
+                mapinfo['height'],
+                mapinfo['origin']['position']['x'],
+                mapinfo['origin']['position']['y'],
+                mapinfo['origin']['position']['z'],
+                mapinfo['origin']['orientation']['x'],
+                mapinfo['origin']['orientation']['y'],
+                mapinfo['origin']['orientation']['z'],
+                mapinfo['origin']['orientation']['w'] 
+            ], dtype=torch.float32).unsqueeze(0)
+            pose = torch.from_numpy(np.stack(traj_buffer.pose_buffer[-1], axis=0)).type(torch.float32).unsqueeze(0)
+            action = torch.zeros((1,1,4)) 
             if len(traj_buffer.actions_buffer[-1])>0:
-                print('actions >0')
-                action = torch.from_numpy(np.stack(traj_buffer.actions_buffer[-1], axis=0))
-            else:
-                print('actions<0')
-            print(action.shape)
+                action = torch.cat((torch.from_numpy(np.stack(traj_buffer.actions_buffer[-1], axis=0)), action[0]), dim=0).type(torch.float32).unsqueeze(0)
+            prompt = traj_buffer.task_buffer[-1]
 
+
+            output = model((im, map, costmap, mapinfo, pose, action, prompt))[-1][-1]
+            
+
+            #print(im.shape)            
+            #print(map.shape)
+            #print(costmap.shape)
+            #print(mapinfo.shape)
+            #print(pose.shape)
+            #print(action.shape)
+            if output[2]**2+output[3]**2>0.5: 
+                publish_pose(driv_pub, output)
+                print('Model published action')
+            else:
+                print('Model wants to end the episode')    
             print('one_move time :', time.time() - start_time)
             time.sleep(1)
 
@@ -89,7 +129,7 @@ if __name__ == '__main__':
     always= True
     )
 
-    #driv_pub = rospy.Publisher(CMD_PUBLISH_TOPIC, Twist, queue_size=1)
+    driv_pub = rospy.Publisher(ACTION_ROSTOPIC, PoseStamped, queue_size=1)
 
     t1 = threading.Thread(target=rospy_thread)
     t2 = threading.Thread(target=behav_clon_inference_thread)

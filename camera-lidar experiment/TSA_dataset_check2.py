@@ -44,11 +44,26 @@ def update(frame):
     dx = arrow_length * np.cos(yaw)
     dy = arrow_length * np.sin(yaw) 
     #arrow = Arrow(pose[frame][0], pose[frame][1], dx, dy, width=300, color='red')
-    arrow = Arrow(map_pose[0], map_pose[1], dx, dy, width=100, color='red')
+    arrow = Arrow(map_pose[0], map_pose[1], dx, dy, width=100, color='blue')
     ax2.add_patch(arrow)
     
     new_action_text = f'Action: {actions[frame]}' if frame < len(actions) else 'Final State'
     action_text.set_text(new_action_text)
+
+    if frame<len(actions):
+        action_pose = world_to_map(
+                    (actions[frame][0], actions[frame][1]), 
+            mapinfo['resolution'], 
+            (mapinfo['origin']['position']['x'], 
+            mapinfo['origin']['position']['y'])
+        )
+        action_quaternion = [0, 0, actions[frame][2], actions[frame][3]]
+        _, _, action_yaw = euler_from_quaternion(action_quaternion)
+        action_yaw = -1*action_yaw
+        a_dx = arrow_length * np.cos(action_yaw)
+        a_dy = arrow_length * np.sin(action_yaw)
+        a_arrow = Arrow(action_pose[0], action_pose[1], a_dx, a_dy, width=100, color='red')
+        ax2.add_patch(a_arrow)
 
 def world_to_map(pose, resolution, origin):
     """
@@ -82,5 +97,5 @@ with open(mapinfo_filename, 'r') as file:
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
 action_text = fig.text(0.5, 0.05, '', ha='center', va='center', fontsize=12, color='red')
-ani = animation.FuncAnimation(fig, update, frames= len(im), repeat=False, interval=9000)
+ani = animation.FuncAnimation(fig, update, frames= len(im), repeat=True, interval=5000)
 plt.show()
