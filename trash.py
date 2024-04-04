@@ -1,23 +1,41 @@
+from geometry_msgs.msg import Twist
 import rospy
-import tf
-from tf.transformations import euler_from_quaternion
+import threading
+import time
 
-rospy.init_node('pose_extractor')
+CMD_PUBLISH_TOPIC = 'rob/cmd_vel'
 
-listener = tf.TransformListener()
+def rospy_thread():
+    while not rospy.is_shutdown():
+        try:
+            rospy.spin()
+        except:
+            pass
 
-rate = rospy.Rate(10.0)
-while not rospy.is_shutdown():
-    try:
-        # Look up the transformation from target frame to source frame
-        (trans, rot) = listener.lookupTransform('/map', '/base_link', rospy.Time(0))
-        print("Translation: ", trans)
-        print("Rotation (quaternion): ", rot)
-        roll, pitch, yaw = euler_from_quaternion(rot)
-        print("Roll: ", roll)
-        print("Pitch: ", pitch)
-        print("Yaw: ", yaw)
-    except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-        continue
 
-    rate.sleep()
+def behav_clon_inference_thread():
+    time.sleep(1)
+    publish_twist(driv_pub, [0, 0])
+
+def publish_twist(publisher, a):
+    twist_msg = Twist()
+    twist_msg.linear.x = a[0]
+    twist_msg.linear.y = 0.0
+    twist_msg.linear.z = 0.0
+    twist_msg.angular.x = 0.0
+    twist_msg.angular.y = 0.0
+    twist_msg.angular.z = a[1]
+    publisher.publish(twist_msg)
+
+
+if __name__ == '__main__':
+    rospy.init_node('test', anonymous=True)
+    driv_pub = rospy.Publisher(CMD_PUBLISH_TOPIC, Twist, queue_size=1)
+
+
+    t1 = threading.Thread(target=rospy_thread)
+    t2 = threading.Thread(target=behav_clon_inference_thread)
+    t1.start()
+    print('Traj gather starts')
+    t2.start()
+    print('Cube Classifier inference starts')

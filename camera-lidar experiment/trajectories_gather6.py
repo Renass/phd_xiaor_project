@@ -46,6 +46,7 @@ class TrajectoryBuffer:
         self.actions_buffer = deque([[]], maxlen=buffer_size)
         self.pose_buffer = deque([[]], maxlen=buffer_size)
         self.map_info = None
+        self.nav_status = None
 
         rospy.init_node('traj_gather_node', anonymous=True)
         rospy.Subscriber(image_topic, Image, self.callback_image)
@@ -79,6 +80,9 @@ class TrajectoryBuffer:
 
 
     def  goal_status_callback(self, status_msg):
+        if status_msg != []:
+            self.nav_status = status_msg.status_list[-1].status
+        #self.nav_status = status_msg.status_list[-1].status
         if self.waiting == 'status' and status_msg.status_list[-1].status in [3,4]:
             self.waiting = 'state'
         #if status_msg.status_list[-1].status == 1:

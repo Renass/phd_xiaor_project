@@ -131,7 +131,7 @@ if __name__ == '__main__':
     )
 
     driv_pub = rospy.Publisher(ACTION_ROSTOPIC, PoseStamped, queue_size=1)
-
+    
     t1 = threading.Thread(target=rospy_thread)
     t2 = threading.Thread(target=behav_clon_inference_thread)
     t1.start()
