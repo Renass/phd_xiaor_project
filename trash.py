@@ -1,41 +1,18 @@
-from geometry_msgs.msg import Twist
-import rospy
-import threading
 import time
 
-CMD_PUBLISH_TOPIC = 'rob/cmd_vel'
+STARTING_POINTS = [
+    [-7.05, 6.51, -0.58, 0.82],
+    [-5.77, 4.33, 0.22, 0.98],
+    [-5.13, 2.73, 0.86, 0.51],
+    [-11.28, 4.76, 0.18, 0.98]
+]
 
-def rospy_thread():
-    while not rospy.is_shutdown():
-        try:
-            rospy.spin()
-        except:
-            pass
+def iterable_index_circle(length):
+    while True: 
+        for i in range(length):
+            yield i
 
-
-def behav_clon_inference_thread():
+starting_point_ind = iterable_index_circle(len(STARTING_POINTS))
+while True:
+    print(STARTING_POINTS[next(starting_point_ind)])
     time.sleep(1)
-    publish_twist(driv_pub, [0, 0])
-
-def publish_twist(publisher, a):
-    twist_msg = Twist()
-    twist_msg.linear.x = a[0]
-    twist_msg.linear.y = 0.0
-    twist_msg.linear.z = 0.0
-    twist_msg.angular.x = 0.0
-    twist_msg.angular.y = 0.0
-    twist_msg.angular.z = a[1]
-    publisher.publish(twist_msg)
-
-
-if __name__ == '__main__':
-    rospy.init_node('test', anonymous=True)
-    driv_pub = rospy.Publisher(CMD_PUBLISH_TOPIC, Twist, queue_size=1)
-
-
-    t1 = threading.Thread(target=rospy_thread)
-    t2 = threading.Thread(target=behav_clon_inference_thread)
-    t1.start()
-    print('Traj gather starts')
-    t2.start()
-    print('Cube Classifier inference starts')

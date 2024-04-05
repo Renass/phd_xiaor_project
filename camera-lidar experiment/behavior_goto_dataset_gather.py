@@ -40,6 +40,7 @@ MAP_SERVICE = '/static_map'
 ACTION_ROSTOPIC = '/move_base_simple/goal'
 
 PROMPT = 'Go to the fridge'
+
 TARGET = [14.9, 5.7, 0.14, 0.99]
 STARTING_POINTS = [
     [15.9, 22.2, -0.97, 0.26],
@@ -47,6 +48,14 @@ STARTING_POINTS = [
     [0.0, 11.3, 0.27, 0.96]
 ]
 
+# Real 2A724_april.yaml 
+#TARGET = [-1.83, 5.45, 0.83, 0.56]
+#STARTING_POINTS = [
+#    [-7.05, 6.51, -0.58, 0.82],
+#    [-5.77, 4.33, 0.22, 0.98],
+#    [-5.13, 2.73, 0.86, 0.51],
+#    [-11.28, 4.76, 0.18, 0.98]
+#]
 
 
 def publish_pose(publisher, action):
@@ -73,9 +82,9 @@ def rospy_thread():
             pass
 
 
-def iterable_index_circle(max_index):
+def iterable_index_circle(length):
     while True: 
-        for i in range(max_index + 1):
+        for i in range(length):
             yield i
 
 def save_thread():
@@ -86,7 +95,6 @@ def save_thread():
             publish_pose(driv_pub, STARTING_POINTS[next(starting_point_ind)])
             time.sleep(1)
             while traj_buffer.nav_status != 3:
-                print(traj_buffer.nav_status)
                 time.sleep(1)
             task_msg = KeyValue()
             task_msg.key = 'new_task'

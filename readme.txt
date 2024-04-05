@@ -50,6 +50,7 @@ Start-up:
     7. launch navigation (move_base) with obstacle map supply (amcl) or mapping (SLAM)
     (SLAM + move_base): 
     * roslaunch xrrobot lidar_slam4.launch (SLAM + move_base)
+    * rosrun map_server map_saver -f ./maps/2A724_april
     (amcl + move_base):
     * roslaunch xrrobot navigate4.launch
     * rosrun map_server map_server ./maps/2A724new.yaml
