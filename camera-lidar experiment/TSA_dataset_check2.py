@@ -15,7 +15,8 @@ Check one trajectory from dataset as a slide show
 camera_image-map(costmap)-action slide show
 '''
 
-FILENAME = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/2A724_sim/tsa-trajs_2024-04-03_19-34-53.h5'
+FILENAME = 'TSA_dataset/nav/tsa-trajs_2024-03-19_15-09-09.h5'
+EPISODE_NUMBER = 1
 
 def update(frame):
     ax1.clear()
@@ -81,11 +82,11 @@ def world_to_map(pose, resolution, origin):
 
 
 with h5py.File(FILENAME, 'r') as file:
-    im = file['states']['data_0'][:]
-    actions = file['actions']['data_0'][:]
-    maps = file['maps']['data_0'][:]
-    costmaps = file['costmaps']['data_0'][:]
-    pose = file['pose']['data_0'][:]
+    im = file['states']['data_'+str(EPISODE_NUMBER)][:]
+    actions = file['actions']['data_'+str(EPISODE_NUMBER)][:]
+    maps = file['maps']['data_'+str(EPISODE_NUMBER)][:]
+    costmaps = file['costmaps']['data_'+str(EPISODE_NUMBER)][:]
+    pose = file['pose']['data_'+str(EPISODE_NUMBER)][:]
 
 if im.dtype == np.float32 or im.dtype == np.float64:
     im = (im - im.min()) / (im.max() - im.min())
@@ -97,5 +98,5 @@ with open(mapinfo_filename, 'r') as file:
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
 action_text = fig.text(0.5, 0.05, '', ha='center', va='center', fontsize=12, color='red')
-ani = animation.FuncAnimation(fig, update, frames= len(im), repeat=True, interval=5000)
+ani = animation.FuncAnimation(fig, update, frames= len(im), repeat=True, interval=3000)
 plt.show()

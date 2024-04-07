@@ -29,11 +29,11 @@ end task:
 rostopic pub /task diagnostic_msgs/KeyValue "{key: 'end_task', value: 'done'}"
 '''
 
-BUFFER_SIZE = 30
-SAVE_DIR = 'TSA_dataset/nav/sim'
+BUFFER_SIZE = 4
+SAVE_DIR = 'TSA_dataset/nav/real'
 
-#IMAGE_TOPIC = '/camera/rgb/image_raw'
-IMAGE_TOPIC = '/image_raw'
+IMAGE_TOPIC = '/camera/rgb/image_raw'
+#IMAGE_TOPIC = '/image_raw'
 
 #MAP_SERVICE = '/dynamic_map'
 MAP_SERVICE = '/static_map'
@@ -41,21 +41,22 @@ ACTION_ROSTOPIC = '/move_base_simple/goal'
 
 PROMPT = 'Go to the fridge'
 
-TARGET = [14.9, 5.7, 0.14, 0.99]
-STARTING_POINTS = [
-    [15.9, 22.2, -0.97, 0.26],
-    [19.0, 15.1, 0.85, 0.52],
-    [0.0, 11.3, 0.27, 0.96]
-]
+#Sim 2A724_x3.yaml
+#TARGET = [14.9, 5.7, 0.14, 0.99]
+#STARTING_POINTS = [
+#    [15.9, 22.2, -0.97, 0.26],
+#    [19.0, 15.1, 0.85, 0.52],
+#    [0.0, 11.3, 0.27, 0.96]
+#]
 
 # Real 2A724_april.yaml 
-#TARGET = [-1.83, 5.45, 0.83, 0.56]
-#STARTING_POINTS = [
-#    [-7.05, 6.51, -0.58, 0.82],
-#    [-5.77, 4.33, 0.22, 0.98],
-#    [-5.13, 2.73, 0.86, 0.51],
-#    [-11.28, 4.76, 0.18, 0.98]
-#]
+TARGET = [-1.83, 5.45, 0.83, 0.56]
+STARTING_POINTS = [
+    [-7.05, 6.51, -0.58, 0.82],
+    [-5.77, 4.33, 0.22, 0.98],
+    [-5.13, 2.73, 0.86, 0.51],
+    [-11.28, 4.76, 0.18, 0.98]
+]
 
 
 def publish_pose(publisher, action):
@@ -95,6 +96,7 @@ def save_thread():
             publish_pose(driv_pub, STARTING_POINTS[next(starting_point_ind)])
             time.sleep(1)
             while traj_buffer.nav_status != 3:
+                print(traj_buffer.nav_status)
                 time.sleep(1)
             task_msg = KeyValue()
             task_msg.key = 'new_task'
@@ -104,11 +106,16 @@ def save_thread():
                 time.sleep(1)
             publish_pose(driv_pub, TARGET)
             time.sleep(1)
-            while traj_buffer.waiting != 'action':
+            while traj_buffer.nav_status != 3:
+                print('waiting nav')
+                print(traj_buffer.nav_status)
                 time.sleep(1)
+            print('here1')
+            time.sleep(2)
             task_msg.key = 'end_task'
             task_msg.value = 'done'
             task_pub.publish(task_msg)
+            print('here')
 
 
 
