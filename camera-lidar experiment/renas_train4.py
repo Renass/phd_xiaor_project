@@ -29,7 +29,7 @@ Actions in ros: position(x,y) orientation quternions (z, w)
 3. (State)-(action) causal Transformer GPT 
 '''
 
-LR = 10e-5
+LR = 10e-6
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 
@@ -37,7 +37,7 @@ DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/tsa-trajs_
 TEST_PART = 0.2
 CHECKPOINT_INTERVAL = 10
 DEVICE_NUM = 2
-BATCH_SIZE = 10
+BATCH_SIZE = 20
 
 WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
 LOAD_WEIGHTS = 'renas4.pt'
@@ -258,7 +258,9 @@ def ddp_train_loop(rank, world_size, train_dataset, test_dataset):
         optimizer.zero_grad()
         for batch in train_dataloader:
             output = model(batch)
-            loss = criterion(output, batch[5].to(rank))
+            loss = criterion(output, batch[5].to(rank))+criterion(output[:,:,2:], batch[5][:,:,2:].to(rank))
+            print('output: ',output)
+            print('target:', batch[5])
             total_loss += loss
             loss.backward()
         optimizer.step()
