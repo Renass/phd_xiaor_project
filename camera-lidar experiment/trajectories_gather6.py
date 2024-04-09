@@ -144,7 +144,9 @@ class TrajectoryBuffer:
             map = np.array(map.data, dtype=np.int8).reshape(map.info.height, map.info.width)
             map[map == -1] = 50
             self.map_buffer[-1].append(map)
-
+            
+            #string below may be not required
+            self.pose_listener.waitForTransform('/map', '/base_link', rospy.Time(0), rospy.Duration(1.0))
             (trans, rot) = self.pose_listener.lookupTransform('/map', '/base_link', rospy.Time(0))
             pose = np.array([
                 trans[0],

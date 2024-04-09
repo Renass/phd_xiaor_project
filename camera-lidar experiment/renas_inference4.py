@@ -36,7 +36,7 @@ MAP_SERVICE = '/static_map'
 
 #whatever the size is - the only current episode would be predicted action
 BUFFER_SIZE = 1
-ACTION_ROSTOPIC = '/move_base_simple/goal'
+ACTION_ROSTOPIC = '/move_base_simple/goals'
 
 
 def rospy_thread():
@@ -88,7 +88,6 @@ def behav_clon_inference_thread():
 
 
             output = model((im, map, costmap, mapinfo, pose, action, prompt))[-1][-1]
-            
 
             #print(im.shape)            
             #print(map.shape)
