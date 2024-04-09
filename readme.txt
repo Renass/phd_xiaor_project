@@ -86,7 +86,7 @@ Start-up:
 
 
 watch -n 1 nvidia-smi
-tensorboard --logdir=/home/renas/pythonprogv2/phd_xiaor_project --port=6007
+tensorboard --logdir=/home/renas/pythonprogv2/phd_xiaor_project --port=6007 --bind_all
 
 
 

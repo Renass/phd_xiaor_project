@@ -29,11 +29,11 @@ Actions in ros: position(x,y) orientation quternions (z, w)
 3. (State)-(action) causal Transformer GPT 
 '''
 
-LR = 10e-6
+LR = 10e-7
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 
-DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/tsa-trajs_2024-03-19_15-09-09.h5'
+DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/real/tsa_combined.h5'
 TEST_PART = 0.2
 CHECKPOINT_INTERVAL = 10
 DEVICE_NUM = 2
