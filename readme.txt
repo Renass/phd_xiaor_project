@@ -53,7 +53,7 @@ Start-up:
     * rosrun map_server map_saver -f ./maps/2A724_april
     (amcl + move_base):
     * roslaunch xrrobot navigate4.launch
-    * rosrun map_server map_server ./maps/2A724new.yaml
+    * rosrun map_server map_server ./maps/2A724_april.yaml
 
     8. rviz -d ./navigate.rviz
 

@@ -12,7 +12,7 @@ State: im, map, costmap, pose, mapinfo, prompt
 Actions in ros: position(x,y) orientation quternions (z, w)
 '''
 
-DATASET_FOLDER = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/real'
+DATASET_FOLDER = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/sim'
 COMBINED_FILE = 'tsa_combined.h5'
 
 

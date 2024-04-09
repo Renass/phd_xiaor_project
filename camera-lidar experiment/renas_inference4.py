@@ -17,12 +17,17 @@ Actions in ros: position(x,y) orientation quternions (z, w)
 1. TEXT-Image encoding using ViLT (trainable) 
 2. >Text-Image token + lidar map, costmap, pose self-attention transformer 
 3. (State)-(action) causal Transformer GPT 
+
+new task:
+rostopic pub /task diagnostic_msgs/KeyValue "{key: 'new_task', value: 'go left'}"
+end task:
+rostopic pub /task diagnostic_msgs/KeyValue "{key: 'end_task', value: 'done'}"
 '''
 
 IMAGE_TOPIC = '/camera/rgb/image_raw'
 #IMAGE_TOPIC = '/image_raw'
 
-LOAD_WEIGHTS = '/home/renas/pythonprogv2/phd_xiaor_project/weights/renas4.pt'
+LOAD_WEIGHTS = '/home/renas/pythonprogv2/phd_xiaor_project/weights/early_renas4.pt'
 
 #For SLAM:
 #MAP_SERVICE = '/dynamic_map'
@@ -91,11 +96,13 @@ def behav_clon_inference_thread():
             #print(mapinfo.shape)
             #print(pose.shape)
             #print(action.shape)
-            if output[2]**2+output[3]**2>0.5: 
+            if output[2]**2+output[3]**2>0.1: 
                 publish_pose(driv_pub, output)
                 print('Model published action')
             else:
-                print('Model wants to end the episode')    
+                print('Model wants to end the episode')
+                print('action:')
+                print(output)    
             print('one_move time :', time.time() - start_time)
             time.sleep(1)
 
