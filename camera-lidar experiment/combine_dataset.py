@@ -19,8 +19,9 @@ COMBINED_FILE = 'tsa_combined.h5'
 
 if __name__ == '__main__':
     combined_path = os.path.join(DATASET_FOLDER, COMBINED_FILE)
+    mapinfo_filename = os.path.join(DATASET_FOLDER, COMBINED_FILE[:-3]+'_mapinfo.json')
 
-    #Mapinfo load and check all matched
+    #Mapinfo loadб check all matchedб if yes, save
     mapinfo_files = [f for f in os.listdir(DATASET_FOLDER) if f.endswith('_mapinfo.json') and f != COMBINED_FILE]
     with open(os.path.join(DATASET_FOLDER, mapinfo_files[0]), 'r') as file:
         mapinfo = json.load(file)
@@ -31,6 +32,8 @@ if __name__ == '__main__':
             print('Mapinfo files are different!')
             sys.exit()    
     print('Mapinfo data is matched')
+    with open(mapinfo_filename, 'w') as txt_file:
+        json.dump(mapinfo, txt_file, indent=4)
 
     
     dataset_counters = {'states': 0, 'maps': 0, 'costmaps': 0, 'pose': 0, 'actions': 0}
@@ -54,3 +57,12 @@ if __name__ == '__main__':
                         new_dataset_name = f"data_{dataset_counters[group_name]}"
                         group.create_dataset(new_dataset_name, data=dataset,dtype = np.float32, compression = 'gzip')
                         dataset_counters[group_name] += 1
+
+    task_filename = os.path.join(DATASET_FOLDER, COMBINED_FILE[:-3]+'_tasks.txt')
+    task_files = [f for f in os.listdir(DATASET_FOLDER) if f.endswith('_tasks.txt') and f != task_filename]
+    with open(task_filename, 'w') as file:
+        for task_file in task_files:
+            task_file_path = os.path.join(DATASET_FOLDER, task_file)
+            with open(task_file_path, 'r') as file1:
+                content = file1.read()
+                file.write(content)
