@@ -111,7 +111,7 @@ class Renas(torch.nn.Module):
             param.requires_grad = True
 
         self.mid_transformer = torch.nn.TransformerEncoder(
-             torch.nn.TransformerEncoderLayer(d_model=self.d_model, nhead=8),
+             torch.nn.TransformerEncoderLayer(d_model=self.d_model, nhead=8, batch_first=True),
              num_layers=4
         )
         

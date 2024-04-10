@@ -36,11 +36,11 @@ LR = 10e-6
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 
-DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/real/tsa_combined.h5'
+DATASET = 'TSA_dataset/nav/real/tsa_combined.h5'
 TEST_PART = 0.2
 CHECKPOINT_INTERVAL = 10
 DEVICE_NUM = 2
-BATCH_SIZE = 20
+BATCH_SIZE = 1
 
 WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
 LOAD_WEIGHTS = 'renas5.pt'
@@ -114,7 +114,7 @@ class Renas(torch.nn.Module):
             param.requires_grad = True
 
         self.mid_transformer = torch.nn.TransformerEncoder(
-             torch.nn.TransformerEncoderLayer(d_model=self.d_model, nhead=8),
+             torch.nn.TransformerEncoderLayer(d_model=self.d_model, nhead=8, batch_first=True),
              num_layers=4
         )
         
@@ -135,40 +135,13 @@ class Renas(torch.nn.Module):
         self.fc2 = torch.nn.Linear(self.d_model, 4)
 
 
-    def forward(self, batch):
-        im, map, costmap, mapinfo, pose, action, prompt = batch
-        i1, i2, i3, i4, i5 = im.size()
-        im = im.view(i1*i2, i3, i4, i5)
+    def forward(self, p):
+        batch_size = p.shape[0]
+        seq_length = p.shape[1]
 
-        map = map.unsqueeze(2).repeat(1, 1, 3, 1, 1)
-        m1, m2, m3, m4, m5 = map.size()
-        map = map.view(m1*m2, m3, m4, m5)
-        map = self.map_processor(images=map, return_tensors="pt", padding=True)['pixel_values'].to(self.device)
-        map = map[:, 0, :, :]
-        map_patch_size = 64
-        map = map.unfold(1, map_patch_size, map_patch_size).unfold(2, map_patch_size, map_patch_size)
-        map = map.contiguous().view(m1*m2, 6 * 6, map_patch_size * map_patch_size)
-        map = self.map2token(map)
-        map = self.pos_enc(map)
-
-        costmap = costmap.unsqueeze(2).repeat(1, 1, 3, 1, 1)
-        costmap = costmap.view(m1*m2, m3, m4, m5)
-        costmap = self.map_processor(images=costmap, return_tensors="pt", padding=True)['pixel_values'].to(self.device)
-        costmap = costmap[:, 0, :, :]
-        costmap = costmap.unfold(1, map_patch_size, map_patch_size).unfold(2, map_patch_size, map_patch_size)
-        costmap = costmap.contiguous().view(m1*m2, 6 * 6, map_patch_size * map_patch_size)
-        costmap = self.map2token(costmap)
-        costmap = self.pos_enc(costmap)
-
-        mapinfo = self.mapinfo2token(mapinfo.to(self.device)).unsqueeze(1).repeat(m2, 1, 1)
-        
-        pose = self.pose2token(pose.to(self.device)).view(m1*m2, -1).unsqueeze(1)
-
-        tokens = torch.cat((map, costmap, mapinfo, pose), dim=1)
-
-
-        actions = self.mid_transformer(tokens)[:,0,:].view(i1,i2, -1)
-        print(actions)
+        pose = self.pose2token(p.to(self.device)).view(batch_size*seq_length, -1).unsqueeze(1)
+        actions = self.mid_transformer(pose)[:,0,:].view(batch_size, seq_length, -1)
+        actions = self.fc2(actions)
         return actions
 
 
@@ -234,11 +207,12 @@ def ddp_train_loop(rank, world_size, train_dataset, test_dataset):
         test_total_loss = 0
         epoch_train_time_start = time.time()
         optimizer.zero_grad()
-        for batch in train_dataloader:
-            output = model(batch)
+        for i, batch in enumerate(train_dataloader):
+            im, map, costmap, mapinfo, pose, action, prompt = batch
+            output = model(p=pose)
             loss = criterion(output, batch[5].to(rank))+criterion(output[:,:,2:], batch[5][:,:,2:].to(rank))
-            print('output: ',output)
-            print('target:', batch[5])
+            #print('output: ',output)
+            #print('target:', batch[5])
             total_loss += loss
             loss.backward()
         optimizer.step()
@@ -250,7 +224,8 @@ def ddp_train_loop(rank, world_size, train_dataset, test_dataset):
 
         with torch.no_grad():
             for batch in test_dataloader:
-                output = model(batch)
+                im, map, costmap, mapinfo, pose, action, prompt = batch
+                output = model(p=pose)
                 test_loss = criterion(output, batch[5].to(rank))
                 test_total_loss += test_loss
             
