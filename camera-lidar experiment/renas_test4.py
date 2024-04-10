@@ -91,6 +91,24 @@ if __name__ == '__main__':
     dataset =  StateActionPromptDataset(im, map, costmap, mapinfo, pose, action, prompt)
     print("Dataset episodes load: ",len(dataset))
     loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False, collate_fn=padding_collate)
-    for batch in loader:
-        output = model(batch)
-        print(output)
+    for i, batch in enumerate(loader):
+        if i ==4:
+            testing_state = 1
+            j = testing_state
+            im, map, costmap, mapinfo, pose, action, prompt = batch
+            im = im[0][j].unsqueeze(0).unsqueeze(0)
+            map = map[0][j].unsqueeze(0).unsqueeze(0)
+            costmap = costmap[0][j].unsqueeze(0).unsqueeze(0)
+            pose = pose[0][j].unsqueeze(0).unsqueeze(0)
+            action = action[0][j].unsqueeze(0).unsqueeze(0)
+            #action = torch.zeros((1,1,4))
+            print(im.shape)            
+            print(map.shape)
+            print(costmap.shape)
+            print(mapinfo.shape)
+            print(pose.shape)
+            print(action.shape) 
+            output1 = model((im, map, costmap, mapinfo, pose, action, prompt))
+            output2 = model(batch)
+            print(output1)
+            print(output2)

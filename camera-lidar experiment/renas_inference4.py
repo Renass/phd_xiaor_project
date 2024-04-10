@@ -87,8 +87,9 @@ def behav_clon_inference_thread():
             prompt = traj_buffer.task_buffer[-1]
 
 
-            output = model((im, map, costmap, mapinfo, pose, action, prompt))[-1][-1]
-
+            output = model((im, map, costmap, mapinfo, pose, action, prompt))
+            print(output)
+            output = output[-1][-1]
             #print(im.shape)            
             #print(map.shape)
             #print(costmap.shape)
@@ -99,9 +100,7 @@ def behav_clon_inference_thread():
                 publish_pose(driv_pub, output)
                 print('Model published action')
             else:
-                print('Model wants to end the episode')
-                print('action:')
-                print(output)    
+                print('Model wants to end the episode')    
             print('one_move time :', time.time() - start_time)
             time.sleep(1)
 
