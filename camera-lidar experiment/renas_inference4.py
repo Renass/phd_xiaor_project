@@ -36,7 +36,7 @@ MAP_SERVICE = '/static_map'
 
 #whatever the size is - the only current episode would be predicted action
 BUFFER_SIZE = 1
-ACTION_ROSTOPIC = '/move_base_simple/goals'
+ACTION_ROSTOPIC = '/move_base_simple/goal'
 
 
 def rospy_thread():
@@ -96,7 +96,7 @@ def behav_clon_inference_thread():
             #print(mapinfo.shape)
             #print(pose.shape)
             #print(action.shape)
-            if output[2]**2+output[3]**2>0.1: 
+            if output[2]**2+output[3]**2>0.5: 
                 publish_pose(driv_pub, output)
                 print('Model published action')
             else:

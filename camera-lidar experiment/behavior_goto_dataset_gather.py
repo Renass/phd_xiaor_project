@@ -30,7 +30,7 @@ rostopic pub /task diagnostic_msgs/KeyValue "{key: 'end_task', value: 'done'}"
 '''
 
 BUFFER_SIZE = 5
-SAVE_DIR = 'TSA_dataset/nav/real/test'
+SAVE_DIR = 'TSA_dataset/nav/real'
 
 IMAGE_TOPIC = '/camera/rgb/image_raw'
 #IMAGE_TOPIC = '/image_raw'
@@ -39,7 +39,7 @@ IMAGE_TOPIC = '/camera/rgb/image_raw'
 MAP_SERVICE = '/static_map'
 ACTION_ROSTOPIC = '/move_base_simple/goal'
 
-PROMPT = 'Go to the fridge'
+PROMPT = 'Go out of the 2A724 lab and turn right'
 
 #Sim 2A724_x3.yaml
 #TARGET = [14.9, 5.7, 0.14, 0.99]
@@ -54,7 +54,7 @@ PROMPT = 'Go to the fridge'
 
 
 # Real 2A724_april.yaml 
-TARGET = [-1.83, 5.45, 0.83, 0.56]
+#TARGET = [-1.83, 5.45, 0.83, 0.56]
 #STARTING_POINTS = [
 #    [-7.05, 6.51, -0.58, 0.82],
 #    [-5.77, 4.33, 0.22, 0.98],
@@ -68,6 +68,9 @@ TARGET = [-1.83, 5.45, 0.83, 0.56]
 #    [-4.37, 5.01, 0.20, 0.98],
 #    [-7.96, 5.91, 0.24, 0.97]
 #]
+
+#Target is rigth turn out of the lab
+TARGET = [-6.17, 6.64, 0.21, 0.98]
 STARTING_POINTS = [
     [-5.25, 2.71, 0.82, 0.57],
     [-2.94, 2.39, 0.17, 0.99],
