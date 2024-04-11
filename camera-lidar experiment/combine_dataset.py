@@ -37,7 +37,7 @@ if __name__ == '__main__':
 
     
     dataset_counters = {'states': 0, 'maps': 0, 'costmaps': 0, 'pose': 0, 'actions': 0}
-    episode_files = [f for f in os.listdir(DATASET_FOLDER) if f.endswith('.h5') and f != COMBINED_FILE]
+    episode_files = sorted([f for f in os.listdir(DATASET_FOLDER) if f.endswith('.h5') and f != COMBINED_FILE])
     with h5py.File(combined_path, 'w') as hf_combined:
         states_group = hf_combined.create_group('states')
         actions_group = hf_combined.create_group('actions')
@@ -59,7 +59,7 @@ if __name__ == '__main__':
                         dataset_counters[group_name] += 1
 
     task_filename = os.path.join(DATASET_FOLDER, COMBINED_FILE[:-3]+'_tasks.txt')
-    task_files = [f for f in os.listdir(DATASET_FOLDER) if f.endswith('_tasks.txt') and f != task_filename]
+    task_files = sorted([f for f in os.listdir(DATASET_FOLDER) if f.endswith('_tasks.txt') and f != task_filename])
     with open(task_filename, 'w') as file:
         for task_file in task_files:
             task_file_path = os.path.join(DATASET_FOLDER, task_file)

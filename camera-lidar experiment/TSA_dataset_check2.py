@@ -15,8 +15,8 @@ Check one trajectory from dataset as a slide show
 camera_image-map(costmap)-action slide show
 '''
 
-FILENAME = 'TSA_dataset/nav/sim/tsa-trajs_2024-04-09_15-56-42.h5'
-EPISODE_NUMBER = 0
+FILENAME = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/real/tsa_combined.h5'
+EPISODE_NUMBER = 78
 
 def update(frame):
     ax1.clear()
