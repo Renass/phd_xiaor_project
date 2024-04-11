@@ -37,7 +37,7 @@ DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/real/tsa_c
 TEST_PART = 0.2
 CHECKPOINT_INTERVAL = 10
 DEVICE_NUM = 2
-BATCH_SIZE = 1
+BATCH_SIZE = 10
 
 WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
 LOAD_WEIGHTS = 'renas4.pt'
@@ -111,7 +111,7 @@ class Renas(torch.nn.Module):
             param.requires_grad = True
 
         self.mid_transformer = torch.nn.TransformerEncoder(
-             torch.nn.TransformerEncoderLayer(d_model=self.d_model, nhead=8, batch_first=False),
+             torch.nn.TransformerEncoderLayer(d_model=self.d_model, nhead=8, batch_first=True),
              num_layers=4
         )
         
