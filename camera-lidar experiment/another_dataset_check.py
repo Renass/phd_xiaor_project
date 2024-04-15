@@ -26,19 +26,30 @@ if __name__ == '__main__':
         costmap_group =hdf['costmaps']
         pose_group = hdf['pose']
         action_group = hdf['actions']
+        n = len(im_group)
+        
+        for i in range(n):
+            episode = 'data_'+str(i)
+            im.append(torch.from_numpy(im_group[episode][:]).float()/255.0)
+            map.append(torch.from_numpy(map_group[episode][:]).float()/100.0)
+            costmap.append(torch.from_numpy(costmap_group[episode][:]).float()/100.0)
+            pose.append(torch.from_numpy(pose_group[episode][:]))
 
-        for i, im_episode in enumerate(im_group):
-            im.append(torch.from_numpy(im_group[im_episode][:]).float()/255.0)
-        for i, map_episode in enumerate(map_group):
-            map.append(torch.from_numpy(map_group[map_episode][:]).float()/100.0)
-        for i, costmap_episode in enumerate(costmap_group):
-            costmap.append(torch.from_numpy(costmap_group[costmap_episode][:]).float()/100.0)
-        for i, pose_episode in enumerate(pose_group):
-            pose.append(torch.from_numpy(pose_group[pose_episode][:]))
-        for i, action_episode in enumerate(action_group):
-            a = torch.from_numpy(action_group[action_episode][:])
-            print(a)
+            a = torch.from_numpy(action_group[episode][:])
             action.append(torch.cat((a, torch.zeros((1,4))), dim=0))
+        
+        
+        #for i, map_episode in enumerate(map_group):
+        #    #print(map_episode)
+        #    map.append(torch.from_numpy(map_group[map_episode][:]).float()/100.0)
+        #for i, costmap_episode in enumerate(costmap_group):
+            #costmap.append(torch.from_numpy(costmap_group[costmap_episode][:]).float()/100.0)
+        #for i, pose_episode in enumerate(pose_group):
+        #    pose.append(torch.from_numpy(pose_group[pose_episode][:]))
+        #for i, action_episode in enumerate(action_group):
+            #a = torch.from_numpy(action_group[action_episode][:])
+            #print('action number ', i, ': ',a)
+            #action.append(torch.cat((a, torch.zeros((1,4))), dim=0))
 
     mapinfo_filename = f"{os.path.splitext(DATASET)[0]}_mapinfo.json"
     with open(mapinfo_filename, 'r') as file:
@@ -59,5 +70,4 @@ if __name__ == '__main__':
     with open(prompt_filename, 'r') as file:
         for p in file:
             prompt.append(p.strip())
-    print(action)
-    print(prompt)
+    #print(prompt)

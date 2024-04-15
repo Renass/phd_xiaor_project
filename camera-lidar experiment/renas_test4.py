@@ -12,6 +12,8 @@ import json
 from torch.utils.data import DataLoader
 
 '''
+CODE NEEDS TO REVISE WITH H5PY DATASET PROBLEM: data_19 earlier than data_2 (alphabetical sorting)
+
 Behavioral cloning Renas  transformer camera-lidar TESTING
 
 State: im, map, costmap, pose, mapinfo, prompt
