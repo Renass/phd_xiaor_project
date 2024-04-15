@@ -29,7 +29,7 @@ Actions in ros: position(x,y) orientation quternions (z, w)
 3. (State)-(action) causal Transformer GPT 
 '''
 
-LR = 10e-6
+LR = 10e-7
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 
@@ -40,7 +40,7 @@ DEVICE_NUM = 2
 BATCH_SIZE = 1
 
 WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
-LOAD_WEIGHTS = 'renas4.pt'
+LOAD_WEIGHTS = 'renas4_10e-6.pt'
 SAVE_WEIGHTS = 'renas4.pt'
 
 class PositionalEncoding(torch.nn.Module):

@@ -3,6 +3,10 @@ import h5py
 import os 
 import json
 
+'''
+fast check of content of hdf dataset
+now: print action
+'''
 DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/real/tsa_combined.h5'
 
 if __name__ == '__main__':
@@ -36,9 +40,8 @@ if __name__ == '__main__':
             pose.append(torch.from_numpy(pose_group[episode][:]))
 
             a = torch.from_numpy(action_group[episode][:])
+            print('action number ', i, ': ',a)
             action.append(torch.cat((a, torch.zeros((1,4))), dim=0))
-        
-        
         #for i, map_episode in enumerate(map_group):
         #    #print(map_episode)
         #    map.append(torch.from_numpy(map_group[map_episode][:]).float()/100.0)

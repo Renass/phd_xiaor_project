@@ -1,11 +1,5 @@
 from renas_train4 import Renas, StateActionPromptDataset, padding_collate
 import torch
-import trajectories_gather6
-import threading
-import rospy
-import time
-import numpy as np
-from geometry_msgs.msg import PoseStamped
 import h5py
 import os
 import json
@@ -27,7 +21,7 @@ Actions in ros: position(x,y) orientation quternions (z, w)
 '''
 
 LOAD_WEIGHTS = '/home/renas/pythonprogv2/phd_xiaor_project/weights/early_renas4.pt'
-DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/real/test/tsa-trajs_2024-04-09_20-45-40.h5'
+DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/real/tsa_combined.h5'
 BATCH_SIZE = 1
 
 if __name__ == '__main__':
@@ -59,16 +53,16 @@ if __name__ == '__main__':
         pose_group = hdf['pose']
         action_group = hdf['actions']
 
-        for i, im_episode in enumerate(im_group):
-            im.append(torch.from_numpy(im_group[im_episode][:]).float()/255.0)
-        for i, map_episode in enumerate(map_group):
-            map.append(torch.from_numpy(map_group[map_episode][:]).float()/100.0)
-        for i, costmap_episode in enumerate(costmap_group):
-            costmap.append(torch.from_numpy(costmap_group[costmap_episode][:]).float()/100.0)
-        for i, pose_episode in enumerate(pose_group):
-            pose.append(torch.from_numpy(pose_group[pose_episode][:]))
-        for i, action_episode in enumerate(action_group):
-            a = torch.from_numpy(action_group[action_episode][:])
+        n = len(im_group)
+
+        for i in range(n):
+            episode = 'data_'+str(i)
+            im.append(torch.from_numpy(im_group[episode][:]).float()/255.0)
+            map.append(torch.from_numpy(map_group[episode][:]).float()/100.0)
+            costmap.append(torch.from_numpy(costmap_group[episode][:]).float()/100.0)
+            pose.append(torch.from_numpy(pose_group[episode][:]))
+
+            a = torch.from_numpy(action_group[episode][:])
             action.append(torch.cat((a, torch.zeros((1,4))), dim=0))
 
     mapinfo_filename = f"{os.path.splitext(DATASET)[0]}_mapinfo.json"
@@ -94,23 +88,7 @@ if __name__ == '__main__':
     print("Dataset episodes load: ",len(dataset))
     loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False, collate_fn=padding_collate)
     for i, batch in enumerate(loader):
-        if i ==4:
-            testing_state = 1
-            j = testing_state
-            im, map, costmap, mapinfo, pose, action, prompt = batch
-            im = im[0][j].unsqueeze(0).unsqueeze(0)
-            map = map[0][j].unsqueeze(0).unsqueeze(0)
-            costmap = costmap[0][j].unsqueeze(0).unsqueeze(0)
-            pose = pose[0][j].unsqueeze(0).unsqueeze(0)
-            action = action[0][j].unsqueeze(0).unsqueeze(0)
-            #action = torch.zeros((1,1,4))
-            print(im.shape)            
-            print(map.shape)
-            print(costmap.shape)
-            print(mapinfo.shape)
-            print(pose.shape)
-            print(action.shape) 
-            output1 = model((im, map, costmap, mapinfo, pose, action, prompt))
-            output2 = model(batch)
-            print(output1)
-            print(output2)
+        print(batch[6])
+        print('target:', batch[5])
+        output2 = model(batch)
+        print('output2: ',output2)
