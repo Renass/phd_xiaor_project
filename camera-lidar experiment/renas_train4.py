@@ -29,7 +29,7 @@ Actions in ros: position(x,y) orientation quternions (z, w)
 3. (State)-(action) causal Transformer GPT 
 '''
 
-LR = 10e-7
+LR = 10e-6
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 
@@ -37,11 +37,11 @@ DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/real/tsa_c
 TEST_PART = 0.2
 CHECKPOINT_INTERVAL = 10
 DEVICE_NUM = 2
-BATCH_SIZE = 10
+BATCH_SIZE = 1
 
 WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
 LOAD_WEIGHTS = 'renas4.pt'
-SAVE_WEIGHTS = 'renas4.pt'
+SAVE_WEIGHTS = 'trash.pt'
 
 class PositionalEncoding(torch.nn.Module):
     def __init__(self, d_model, dropout=0.1, max_len=5000):
@@ -259,8 +259,8 @@ def ddp_train_loop(rank, world_size, train_dataset, test_dataset):
         for batch in train_dataloader:
             output = model(batch)
             loss = criterion(output, batch[5].to(rank))+criterion(output[:,:,2:], batch[5][:,:,2:].to(rank))
-            print('output: ',output)
-            print('target:', batch[5])
+            #print('output: ',output)
+            #print('target:', batch[5])
             total_loss += loss
             loss.backward()
         optimizer.step()
@@ -350,6 +350,7 @@ if __name__ == '__main__':
     with open(prompt_filename, 'r') as file:
         for p in file:
             prompt.append(p.strip())
+    print(action)
     dataset =  StateActionPromptDataset(im, map, costmap, mapinfo, pose, action, prompt)
     train_dataset, test_dataset = torch.utils.data.random_split(dataset, [1-TEST_PART, TEST_PART])
     print("Dataset episodes load: ",len(dataset))
