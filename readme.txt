@@ -62,7 +62,7 @@ Start-up:
 3. GAZEBO virtual env (camera-lidar experiment): 
     1. Launch environment
     * roslaunch mobile_manipulator_body 2A724_empty.launch
-    * roslaunch mobile_manipulator_body 2A724_m.launch
+    * roslaunch mobile_manipulator_body 2A724_m2.launch
     * roslaunch mobile_manipulator_body base_gazebo_control.launch
     2. launch navigation (move_base) with obstacle map supply (amcl) or mapping (SLAM)
     (SLAM + move_base): 
