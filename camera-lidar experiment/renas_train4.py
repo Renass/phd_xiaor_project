@@ -29,7 +29,7 @@ Actions in ros: position(x,y) orientation quternions (z, w)
 3. (State)-(action) causal Transformer GPT 
 '''
 
-LR = 10e-7
+LR = 10e-8
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 
@@ -258,7 +258,8 @@ def ddp_train_loop(rank, world_size, train_dataset, test_dataset):
         optimizer.zero_grad()
         for batch in train_dataloader:
             output = model(batch)
-            loss = criterion(output, batch[5].to(rank))+criterion(output[:,:,2:], batch[5][:,:,2:].to(rank))
+            loss = criterion(output, batch[5].to(rank))
+            #loss = criterion(output, batch[5].to(rank))+criterion(output[:,:,2:], batch[5][:,:,2:].to(rank))
             #print('output: ',output)
             #print('target:', batch[5])
             total_loss += loss
@@ -268,6 +269,7 @@ def ddp_train_loop(rank, world_size, train_dataset, test_dataset):
         average_loss = total_loss/len(train_dataloader)
         if rank==0:
             ten_board_writer.add_scalar('Loss', average_loss.item(), epoch)
+            
             print('\nEpoch: ', epoch,"  Training Loss:", average_loss.item())
 
         with torch.no_grad():
