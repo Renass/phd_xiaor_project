@@ -29,11 +29,11 @@ end task:
 rostopic pub /task diagnostic_msgs/KeyValue "{key: 'end_task', value: 'done'}"
 '''
 
-BUFFER_SIZE = 5
-SAVE_DIR = 'TSA_dataset/nav/real'
+BUFFER_SIZE = 20
+SAVE_DIR = 'TSA_dataset/nav/sim'
 
-IMAGE_TOPIC = '/camera/rgb/image_raw'
-#IMAGE_TOPIC = '/image_raw'
+#IMAGE_TOPIC = '/camera/rgb/image_raw'
+IMAGE_TOPIC = '/image_raw'
 
 #MAP_SERVICE = '/dynamic_map'
 MAP_SERVICE = '/static_map'
@@ -50,6 +50,15 @@ PROMPT = 'Go out of the 2A724 lab and turn right'
 #    [10.56, 4.60, 0.03, 1.00],
 #    [8.23, 17.02, 0.02, 1.0]
 #]
+#out of lab and turn right target
+TARGET = [15.30, 21.31, -0.53, 0.85]
+STARTING_POINTS = [
+    [-0.55, 10.63, 0.26, 0.96],
+    [4.38, 14.34, 0.29, 0.96],
+    [12.38, 19.73, -0.96, 0.28],
+    [12.17, 14.60, -0.56, 0.83],
+    [7.72, 7.84, -0.52, 0.85]
+]
 
 
 
@@ -70,14 +79,14 @@ PROMPT = 'Go out of the 2A724 lab and turn right'
 #]
 
 #Target is rigth turn out of the lab
-TARGET = [-6.17, 6.64, 0.21, 0.98]
-STARTING_POINTS = [
-    [-5.25, 2.71, 0.82, 0.57],
-    [-2.94, 2.39, 0.17, 0.99],
-    [-5.93, 4.29, 0.17, 0.99],
-    [-3.28, 5.40, -0.98, 0.20],
-    [-3.58, -0.28, 0.85, 0.52]
-]
+#TARGET = [-6.17, 6.64, 0.21, 0.98]
+#STARTING_POINTS = [
+#    [-5.25, 2.71, 0.82, 0.57],
+#    [-2.94, 2.39, 0.17, 0.99],
+#    [-5.93, 4.29, 0.17, 0.99],
+#    [-3.28, 5.40, -0.98, 0.20],
+#    [-3.58, -0.28, 0.85, 0.52]
+#]
 
 
 def publish_pose(publisher, action):

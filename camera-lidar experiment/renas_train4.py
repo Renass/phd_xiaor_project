@@ -29,19 +29,19 @@ Actions in ros: position(x,y) orientation quternions (z, w)
 3. (State)-(action) causal Transformer GPT 
 '''
 
-LR = 10e-8
+LR = 10e-6
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 
-DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/real/tsa_combined.h5'
+DATASET = 'TSA_dataset/nav/sim/tsa_combined.h5'
 TEST_PART = 0.2
 CHECKPOINT_INTERVAL = 10
 DEVICE_NUM = 2
-BATCH_SIZE = 1
+BATCH_SIZE = 2
 
 WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
 LOAD_WEIGHTS = 'renas4_10e-6.pt'
-SAVE_WEIGHTS = 'renas4.pt'
+SAVE_WEIGHTS = 'trash.pt'
 
 class PositionalEncoding(torch.nn.Module):
     def __init__(self, d_model, dropout=0.1, max_len=5000):
