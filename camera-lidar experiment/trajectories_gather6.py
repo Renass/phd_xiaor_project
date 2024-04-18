@@ -80,7 +80,7 @@ class TrajectoryBuffer:
 
 
     def  goal_status_callback(self, status_msg):
-        if status_msg != []:
+        if status_msg.status_list != []:
             self.nav_status = status_msg.status_list[-1].status
         #self.nav_status = status_msg.status_list[-1].status
         if self.waiting == 'status' and status_msg.status_list[-1].status in [3,4]:

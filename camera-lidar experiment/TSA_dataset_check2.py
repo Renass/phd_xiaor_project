@@ -16,7 +16,7 @@ camera_image-map(costmap)-action slide show
 '''
 
 FILENAME = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/real/tsa_combined.h5'
-EPISODE_NUMBER = 78
+EPISODE_NUMBER = 8
 
 def update(frame):
     ax1.clear()
@@ -98,5 +98,5 @@ with open(mapinfo_filename, 'r') as file:
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
 action_text = fig.text(0.5, 0.05, '', ha='center', va='center', fontsize=12, color='red')
-ani = animation.FuncAnimation(fig, update, frames= len(im), repeat=True, interval=3000)
+ani = animation.FuncAnimation(fig, update, frames= len(im), repeat=True, interval=10000)
 plt.show()
