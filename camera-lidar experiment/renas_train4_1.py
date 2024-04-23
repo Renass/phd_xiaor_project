@@ -19,29 +19,30 @@ import shutil
 
 '''
 Behavioral cloning Renas  transformer camera-lidar TRAIN LOOP
+SINGLE AND STATIC MAP VERSION
 
-State: im, map, costmap, pose, mapinfo, prompt
+State: im, map (single per dataset), NO costmap, pose, mapinfo (single per dataset), prompt
 
 Actions in ros: position(x,y) orientation quternions (z, w)
 
 1. TEXT-Image encoding using ViLT (trainable) 
-2. >Text-Image token + lidar map, costmap, pose self-attention transformer 
+2. >Text-Image token + lidar map, NO costmap, pose self-attention transformer 
 3. (State)-(action) causal Transformer GPT 
 '''
 
-LR = 10e-6
+LR = 10e-8
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 
-DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/sim/tsa_combined.h5'
+DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/real/tsa_combined.h5'
 TEST_PART = 0.2
-CHECKPOINT_INTERVAL = 10
+CHECKPOINT_INTERVAL = 50
 DEVICE_NUM = 2
-BATCH_SIZE = 2
+BATCH_SIZE = 10
 
 WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
-LOAD_WEIGHTS = 'renas4_10e-6.pt'
-SAVE_WEIGHTS = 'renas4.pt'
+LOAD_WEIGHTS = 'renas4_1.py'
+SAVE_WEIGHTS = 'renas4_1.py'
 
 class PositionalEncoding(torch.nn.Module):
     def __init__(self, d_model, dropout=0.1, max_len=5000):
@@ -67,10 +68,9 @@ class EncodingVector(torch.nn.Module):
         return x + self.modality_vector.unsqueeze(0).unsqueeze(0)
 
 class StateActionPromptDataset(Dataset):
-    def __init__(self, im, map, costmap, mapinfo, pose, action, prompt):
+    def __init__(self, im, map, mapinfo, pose, action, prompt):
         self.im = im
         self.map = map
-        self.costmap = costmap
         self.mapinfo = mapinfo
         self.pose = pose
         self.action = action
@@ -82,13 +82,12 @@ class StateActionPromptDataset(Dataset):
 
     def __getitem__(self, idx):
         im = self.im[idx]
-        map = self.map[idx]
-        costmap = self.costmap[idx]
+        map = self.map[0]
         mapinfo = self.mapinfo
         pose = self.pose[idx]
         action = self.action[idx]
         prompt = self.prompt[idx]
-        return im, map, costmap, mapinfo, pose, action, prompt
+        return im, map, mapinfo, pose, action, prompt
 
 class Renas(torch.nn.Module):
     def __init__(self, device):
@@ -100,18 +99,13 @@ class Renas(torch.nn.Module):
         self.processor.current_processor.do_resize = True
         self.processor.current_processor.do_normalize = False
 
-        self.map_processor = ViltImageProcessor.from_pretrained("dandelin/vilt-b32-mlm")
-        self.map_processor.do_resize = True
-        self.map_processor.do_rescale = False
-        self.map_processor.do_normalize = False
-
         self.vilt_model = ViltModel.from_pretrained("dandelin/vilt-b32-mlm")
         self.d_model = self.vilt_model.config.hidden_size
         for param in self.vilt_model.parameters():
             param.requires_grad = True
 
         self.mid_transformer = torch.nn.TransformerEncoder(
-             torch.nn.TransformerEncoderLayer(d_model=self.d_model, nhead=8, batch_first=True),
+             torch.nn.TransformerEncoderLayer(d_model=self.d_model, nhead=12, batch_first=True),
              num_layers=4
         )
         
@@ -133,8 +127,7 @@ class Renas(torch.nn.Module):
 
 
     def forward(self, batch):
-        test_time = time.time()
-        im, map, costmap, mapinfo, pose, action, prompt = batch
+        im, map, mapinfo, pose, action, prompt = batch
         i1, i2, i3, i4, i5 = im.size()
         im = im.view(i1*i2, i3, i4, i5)
 
@@ -144,33 +137,34 @@ class Renas(torch.nn.Module):
         im_prompt = self.processor(images=im, text=prompt, return_tensors="pt", padding=True).to(self.device)
         im_prompt = self.vilt_model(**im_prompt).pooler_output.unsqueeze(1)
         
-        map = map.unsqueeze(2).repeat(1, 1, 3, 1, 1)
-        m1, m2, m3, m4, m5 = map.size()
-        map = map.view(m1*m2, m3, m4, m5)
-        map = self.map_processor(images=map, return_tensors="pt", padding=True)['pixel_values'].to(self.device)
-        map = map[:, 0, :, :]
-        map_patch_size = 64
-        map = map.unfold(1, map_patch_size, map_patch_size).unfold(2, map_patch_size, map_patch_size)
-        map = map.contiguous().view(m1*m2, 6 * 6, map_patch_size * map_patch_size)
+        #map = map.unsqueeze(2).repeat(1, 1, 3, 1, 1)
+        #m1, m2, m3, m4, m5 = map.size()
+        #map = map.view(m1*m2, m3, m4, m5)
+        #map = self.map_processor(images=map, return_tensors="pt", padding=True)['pixel_values'].to(self.device)
+        #map = map[:, 0, :, :]
+        #map_patch_size = 64
+        #map = map.unfold(1, map_patch_size, map_patch_size).unfold(2, map_patch_size, map_patch_size)
+        #map = map.contiguous().view(m1*m2, 6 * 6, map_patch_size * map_patch_size)
+        map = map.to(self.device)
         map = self.map2token(map)
+        map = map.view(i1*i2, 36, self.d_model)
         map = self.pos_enc(map)
-        print( 'here time1',time.time()- test_time)
+        #costmap = costmap.unsqueeze(2).repeat(1, 1, 3, 1, 1)
+        #m1, m2, m3, m4, m5 = costmap.size()
+        #costmap = costmap.view(m1*m2, m3, m4, m5).to(self.device)
+        #print( 'here time2',time.time()- test_time)
+        #costmap = self.map_processor(images=costmap, return_tensors="pt", padding=True)['pixel_values'].to(self.device)
+        #print( 'here time3',time.time()- test_time)
+        #costmap = costmap[:, 0, :, :]
+        #costmap = costmap.unfold(1, map_patch_size, map_patch_size).unfold(2, map_patch_size, map_patch_size)
+        #costmap = costmap.contiguous().view(m1*m2, 6 * 6, map_patch_size * map_patch_size)
 
-        costmap = costmap.unsqueeze(2).repeat(1, 1, 3, 1, 1)
-        costmap = costmap.view(m1*m2, m3, m4, m5).to(self.device)
-        print( 'here time2',time.time()- test_time)
-        costmap = self.map_processor(images=costmap, return_tensors="pt", padding=True)['pixel_values'].to(self.device)
-        print( 'here time3',time.time()- test_time)
-        costmap = costmap[:, 0, :, :]
-        costmap = costmap.unfold(1, map_patch_size, map_patch_size).unfold(2, map_patch_size, map_patch_size)
-        costmap = costmap.contiguous().view(m1*m2, 6 * 6, map_patch_size * map_patch_size)
-        costmap = self.map2token(costmap)
-        costmap = self.pos_enc(costmap)  
-        mapinfo = self.mapinfo2token(mapinfo.to(self.device)).unsqueeze(1).repeat(m2, 1, 1)
+        mapinfo = self.mapinfo2token(mapinfo.to(self.device)).unsqueeze(1).repeat(i2, 1, 1)
         
-        pose = self.pose2token(pose.to(self.device)).view(m1*m2, -1).unsqueeze(1)
+        pose = self.pose2token(pose.to(self.device)).view(i1*i2, -1).unsqueeze(1)
 
-        tokens = torch.cat((im_prompt, map, costmap, mapinfo, pose), dim=1)
+
+        tokens = torch.cat((im_prompt, map, mapinfo, pose), dim=1)
 
 
         states = self.mid_transformer(tokens)[:,0,:].view(i1,i2, -1)
@@ -193,7 +187,7 @@ class Renas(torch.nn.Module):
         tokens = self.gpt_model(inputs_embeds = tokens).last_hidden_state
         #print(tokens.shape)
         tokens = self.fc2(tokens[:, 0::2, :])
-        #print(tokens.shape)      
+        #print(tokens.shape) 
         return tokens
 
 
@@ -202,10 +196,10 @@ class Renas(torch.nn.Module):
 
 def padding_collate(batch):
     new_batch = []
-    for i in range(6): # 7 data types: im, map, costmap, mapinfo, pose, action, prompt
+    for i in range(5): # 6 data types: im, map, mapinfo, pose, action, prompt
         new_batch.append([item[i] for item in batch])
         new_batch[i] = pad_sequence(new_batch[i], batch_first=True)
-    new_batch.append([item[6] for item in batch])
+    new_batch.append([item[5] for item in batch])
     return new_batch
 
 def ddp_setup(rank, world_size):
@@ -261,7 +255,7 @@ def ddp_train_loop(rank, world_size, train_dataset, test_dataset):
         optimizer.zero_grad()
         for batch in train_dataloader:
             output = model(batch)
-            loss = criterion(output, batch[5].to(rank))
+            loss = criterion(output, batch[4].to(rank))
             #loss = criterion(output, batch[5].to(rank))+criterion(output[:,:,2:], batch[5][:,:,2:].to(rank))
             #print('output: ',output)
             #print('target:', batch[5])
@@ -278,7 +272,7 @@ def ddp_train_loop(rank, world_size, train_dataset, test_dataset):
         with torch.no_grad():
             for batch in test_dataloader:
                 output = model(batch)
-                test_loss = criterion(output, batch[5].to(rank))
+                test_loss = criterion(output, batch[4].to(rank))
                 test_total_loss += test_loss
             
             torch.distributed.all_reduce(test_total_loss, op=torch.distributed.ReduceOp.SUM)
@@ -311,29 +305,51 @@ if __name__ == '__main__':
     else:
         print('No CUDA devices available')
 
+    map_processor = ViltImageProcessor.from_pretrained("dandelin/vilt-b32-mlm")
+    map_processor.do_resize = True
+    map_processor.do_rescale = False
+    map_processor.do_normalize = False
+
     im = []
     map = []
-    costmap = []
     pose = []
     action = []
     prompt = []
     with h5py.File(DATASET, 'r') as hdf:
         im_group = hdf['states']
         map_group =hdf['maps']
-        costmap_group =hdf['costmaps']
         pose_group = hdf['pose']
         action_group = hdf['actions']
-        n = len(im_group)
+        num_episodes = len(im_group)
 
-        for i in range(n):
+        preprocess_timer_start = time.time()
+        for i in range(num_episodes):
             episode = 'data_'+str(i)
             im.append(torch.from_numpy(im_group[episode][:]).float()/255.0)
-            map.append(torch.from_numpy(map_group[episode][:]).float()/100.0)
-            costmap.append(torch.from_numpy(costmap_group[episode][:]).float()/100.0)
+            if i==0:
+                map_i = torch.from_numpy(map_group[episode][:]).float()/100.0
+                map_i = map_i.unsqueeze(1).repeat(1, 3, 1, 1)
+                map_i = map_processor(images=map_i, return_tensors="pt", padding=True)['pixel_values']
+                map_i = map_i[:, 0, :, :]
+                map_patch_size = 64
+                map_i = map_i.unfold(1, map_patch_size, map_patch_size).unfold(2, map_patch_size, map_patch_size)
+                map_i = map_i.contiguous().view(-1, 6 * 6, map_patch_size * map_patch_size)
+                map.append(map_i)
+
+
             pose.append(torch.from_numpy(pose_group[episode][:]))
 
             a = torch.from_numpy(action_group[episode][:])
             action.append(torch.cat((a, torch.zeros((1,4))), dim=0))
+        print('preprocess full time: ',time.time()-preprocess_timer_start)
+
+    #m1, m2, m3, m4, m5 = map.size()
+    #map = map.view(m1*m2, m3, m4, m5)
+    #map = map_processor(images=map, return_tensors="pt", padding=True)['pixel_values']
+    #map = map[:, 0, :, :]
+    #map_patch_size = 64
+    #map = map.unfold(1, map_patch_size, map_patch_size).unfold(2, map_patch_size, map_patch_size)
+    #map = map.contiguous().view(m1*m2, 6 * 6, map_patch_size * map_patch_size)
 
     mapinfo_filename = f"{os.path.splitext(DATASET)[0]}_mapinfo.json"
     with open(mapinfo_filename, 'r') as file:
@@ -355,7 +371,7 @@ if __name__ == '__main__':
         for p in file:
             prompt.append(p.strip())
     #print(action)
-    dataset =  StateActionPromptDataset(im, map, costmap, mapinfo, pose, action, prompt)
+    dataset =  StateActionPromptDataset(im, map, mapinfo, pose, action, prompt)
     train_dataset, test_dataset = torch.utils.data.random_split(dataset, [1-TEST_PART, TEST_PART])
     print("Dataset episodes load: ",len(dataset))
 
