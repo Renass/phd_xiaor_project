@@ -41,8 +41,8 @@ DEVICE_NUM = 2
 BATCH_SIZE = 10
 
 WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
-LOAD_WEIGHTS = 'renas4_1.py'
-SAVE_WEIGHTS = 'renas4_1.py'
+LOAD_WEIGHTS = 'renas4_1.pt'
+SAVE_WEIGHTS = 'renas4_1.pt'
 
 class PositionalEncoding(torch.nn.Module):
     def __init__(self, d_model, dropout=0.1, max_len=5000):
