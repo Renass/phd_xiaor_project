@@ -15,8 +15,8 @@ Check one trajectory from dataset as a slide show
 camera_image-map(costmap)-action slide show
 '''
 
-FILENAME = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/sim/poses_2024-04-25_15-00-52.h5'
-EPISODE_NUMBER = 1
+FILENAME = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/poses/poses_2024-04-25_15-00-52.h5'
+EPISODE_NUMBER = 0
 
 def update(frame):
     ax1.clear()
@@ -38,6 +38,7 @@ def update(frame):
         (mapinfo['origin']['position']['x'], 
         mapinfo['origin']['position']['y'])
     )
+    print(map_pose)
     quaternion = [0, 0, pose[frame][2], pose[frame][3]]
     _, _, yaw = euler_from_quaternion(quaternion)
     yaw = -1*yaw
@@ -98,5 +99,5 @@ with open(mapinfo_filename, 'r') as file:
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
 action_text = fig.text(0.5, 0.05, '', ha='center', va='center', fontsize=12, color='red')
-ani = animation.FuncAnimation(fig, update, frames= len(im), repeat=True, interval=1000)
+ani = animation.FuncAnimation(fig, update, frames= len(im), repeat=False, interval=1000)
 plt.show()
