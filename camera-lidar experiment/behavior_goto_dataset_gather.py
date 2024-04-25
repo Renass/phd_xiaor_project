@@ -39,10 +39,10 @@ IMAGE_TOPIC = '/image_raw'
 MAP_SERVICE = '/static_map'
 ACTION_ROSTOPIC = '/move_base_simple/goal'
 
-PROMPT = 'Go out of the 2A724 lab and turn right'
+PROMPT = 'Go to the fridge'
 
 #Sim 2A724_x3.yaml
-#TARGET = [14.9, 5.7, 0.14, 0.99]
+TARGET = [14.9, 5.7, 0.14, 0.99]
 #STARTING_POINTS = [
 #    [15.9, 22.2, -0.97, 0.26],
 #    [19.0, 15.1, 0.85, 0.52],
@@ -51,15 +51,21 @@ PROMPT = 'Go out of the 2A724 lab and turn right'
 #    [8.23, 17.02, 0.02, 1.0]
 #]
 #out of lab and turn right target
-TARGET = [15.30, 21.31, -0.53, 0.85]
+#TARGET = [15.30, 21.31, -0.53, 0.85]
+#TARTING_POINTS = [
+#    [-0.55, 10.63, 0.26, 0.96],
+#    [4.38, 14.34, 0.29, 0.96],
+#    [12.38, 19.73, -0.96, 0.28],
+#    [12.17, 14.60, -0.56, 0.83],
+#   [7.72, 7.84, -0.52, 0.85]
+#]
 STARTING_POINTS = [
-    [-0.55, 10.63, 0.26, 0.96],
-    [4.38, 14.34, 0.29, 0.96],
-    [12.38, 19.73, -0.96, 0.28],
-    [12.17, 14.60, -0.56, 0.83],
-    [7.72, 7.84, -0.52, 0.85]
+    [4.21, 15.22, 0.17, 0.98],
+    [9.02, 17.41, 0.31, 0.95],
+    [13.28, 12.97, 0.85, 0.52],
+    [6.85, 10.36, 0.82, 0.57],
+    [8.12, 7.24, 0.83, 0.55]
 ]
-
 
 
 # Real 2A724_april.yaml 
@@ -206,8 +212,9 @@ if __name__ == '__main__':
     #rospy.init_node('behavior_goto_node', anonymous=True)
     driv_pub = rospy.Publisher(ACTION_ROSTOPIC, PoseStamped, queue_size=1)
     task_pub = rospy.Publisher('/task', KeyValue, queue_size=1)
-
-    publish_pose(driv_pub, torch.zeros((4)))
+    
+    #print('That was publishing zeros I don't know why')
+    #publish_pose(driv_pub, torch.zeros((4)))
 
     t1 = threading.Thread(target=rospy_thread)
     t2 = threading.Thread(target=save_thread)
