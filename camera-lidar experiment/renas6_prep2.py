@@ -3,7 +3,7 @@ import h5py
 import os
 from torch.utils.data import Dataset, DataLoader
 from transformers import ViltProcessor, ViltModel
-import pandas as pd
+import numpy as np
 
 '''
 Preparing action tokens vocabulary from action-prompt forward pass 
@@ -74,7 +74,7 @@ if __name__ == '__main__':
             #Every episode should contain only 1 image desribing action result
             im_i= im_i[0].unsqueeze(0)
             im.append(im_i)
-            actions_i = torch.from_numpy(hdf['actions'][episode_i][:]).float()
+            actions_i = hdf['actions'][episode_i][:]
             action.append(actions_i)
     
     prompt_filename = f'{os.path.splitext(DATASET)[0][:-9]}_tasks.txt'
@@ -87,20 +87,14 @@ if __name__ == '__main__':
     
     model = ActionCoder(device).to(device)
     model.eval()
-    data = []
-    with torch.no_grad():
-        for batch in dataloader:
-            tokens = model(batch)
-            for i in range(batch[0].shape[0]):
-                id = len(data)
-                data.append(
-                    {"id": id, 
-                    "prompt" : batch[1][i],
-                    "action" : action[id],
-                    "token" : tokens[i]
-                })
-    for item in data:
-        item["token"] = item["token"].tolist() 
-    df = pd.DataFrame(data)
-    print(df.head())
-    df.to_csv(DATASET[:-12]+"_action_vocab.csv", index=False)
+    id = 0
+    with h5py.File(DATASET[:-12]+"_action_vocab.h5", 'w') as new_hdf:
+        new_hdf_actions_group = new_hdf.create_group('actions')
+        new_hdf_tokens_group = new_hdf.create_group('tokens')
+        with torch.no_grad():
+            for batch in dataloader:
+                tokens = model(batch)
+                for i in range(batch[0].shape[0]):
+                    new_hdf_actions_group.create_dataset('data_'+str(id), data=action[id], dtype = np.float32, compression = 'gzip')
+                    new_hdf_tokens_group.create_dataset('data_'+str(id), data=tokens[i].cpu(), dtype = np.float32, compression = 'gzip')
+                    id += 1
