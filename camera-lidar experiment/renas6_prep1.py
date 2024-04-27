@@ -9,6 +9,7 @@ import numpy as np
 import cv2
 
 '''
+rework(im_map)as_im
 REWORK h5 dataset to:
 1. image processor to image, resize 
 2. Put an arrow to lidar map, resize 
@@ -18,7 +19,7 @@ save as a new hdf
 '''
 
 
-DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/tsa_combined.h5'
+DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/poses/poses_2024-04-25_15-00-52.h5'
 
 def world_to_map(pose, resolution, origin):
     """
