@@ -3,6 +3,14 @@ import h5py
 import os
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
+from torch.nn.utils.rnn import pad_sequence
+from torch.utils.tensorboard import SummaryWriter
+from torch.optim.lr_scheduler import SequentialLR, LinearLR, CosineAnnealingLR, ConstantLR
+import time
+import shutil
+from transformers import ViltProcessor, ViltModel, ViltImageProcessor
+import math
+from transformers import OpenAIGPTConfig, OpenAIGPTModel
 
 '''
 Behavioral cloning Renas  transformer camera-lidar TRAIN LOOP
@@ -16,9 +24,19 @@ Actions for model are explored (im-prompt description) and set as tokens vocabul
 1. TEXT-Image(camera+map concatenation) encoding using ViLT (trainable) 
 2. (im_prompt)-(action) causal Transformer GPT 
 '''
+LR = 10e-6
+LR_WARMUP_EPOCHS = 5 
+LR_DECAY_EPOCHS = 100
 
 DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/tsa_combined_reworked.h5'
 POSES = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/poses/poses_2024-04-25_15-00-52_action_vocab.h5'
+TEST_PART = 0.2
+BATCH_SIZE = 5
+CHECKPOINT_INTERVAL = 50
+
+WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
+LOAD_WEIGHTS = 'renas6.pt'
+SAVE_WEIGHTS = 'renas6.pt'
 
 class StateActionPromptDataset(Dataset):
     def __init__(self, im, action, prompt):
@@ -33,6 +51,82 @@ class StateActionPromptDataset(Dataset):
         prompt = self.prompt[idx]
         return im, action, prompt
     
+class PositionalEncoding(torch.nn.Module):
+    def __init__(self, d_model, dropout=0.1, max_len=5000):
+        super(PositionalEncoding, self).__init__()
+        self.dropout = torch.nn.Dropout(p=dropout)
+
+        position = torch.arange(max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model))
+        pe = torch.zeros(max_len, 1, d_model)
+        pe[:, 0, 0::2] = torch.sin(position * div_term)
+        pe[:, 0, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        x = x + self.pe[:x.size(0)]
+        return self.dropout(x)
+    
+class EncodingVector(torch.nn.Module):
+    def __init__(self, d_model):
+        super(EncodingVector, self).__init__()
+        self.modality_vector = torch.nn.Parameter(torch.randn(d_model))
+    def forward(self, x):
+        return x + self.modality_vector.unsqueeze(0).unsqueeze(0)
+
+class Renas(torch.nn.Module):
+    def __init__(self, device):
+        super(Renas, self).__init__()
+        self.device = device
+        
+        self.processor = ViltProcessor.from_pretrained("dandelin/vilt-b32-mlm")
+        self.processor.current_processor.do_rescale = False
+        self.processor.current_processor.do_resize = False
+        self.processor.current_processor.do_normalize = False
+
+        self.vilt_model = ViltModel.from_pretrained("dandelin/vilt-b32-mlm")
+        self.d_model = self.vilt_model.config.hidden_size
+        for param in self.vilt_model.parameters():
+            param.requires_grad = True  
+
+        self.pos_enc = PositionalEncoding(d_model=self.d_model)
+
+        self.im_prompt_enc_vector = EncodingVector(d_model=self.d_model)
+        self.actions_enc_vector = EncodingVector(d_model=self.d_model)
+        
+        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=4, n_head=12)
+        self.gpt_model = OpenAIGPTModel(self.gpt_config)
+
+
+
+    def forward(self, batch):
+        im, action, prompt = batch
+        i1, i2, i3, i4, i5 = im.size()
+        im = im.view(i1*i2, i3, i4, i5)
+
+        prompt = [prompt for prompt in prompt for _ in range(i2)]
+
+
+        im_prompt = self.processor(images=im, text=prompt, return_tensors="pt", padding=True).to(self.device)
+        im_prompt = self.vilt_model(**im_prompt).pooler_output.unsqueeze(0).view(i1, i2, self.d_model)
+        
+        actions = action.to(self.device)
+        
+        im_prompt = self.im_prompt_enc_vector(im_prompt)
+        actions = self.actions_enc_vector(actions)
+
+        im_prompt = self.pos_enc(im_prompt)
+        actions = self.pos_enc(actions)
+        
+        # 2 types of data for gpt
+        tokens = torch.zeros(i1, i2*2, self.d_model, device=self.device)
+        tokens[:, 0::2, :] = im_prompt
+        tokens[:, 1::2, :] = actions
+
+        tokens = self.gpt_model(inputs_embeds = tokens).last_hidden_state
+        tokens = tokens[:, 0::2, :] 
+        return tokens
+    
 def action2token_vocab(action, action_vocab_token, action_vocab_action):
     action = action.unsqueeze(1)
     action_vocab_action = action_vocab_action.unsqueeze(0) 
@@ -41,6 +135,91 @@ def action2token_vocab(action, action_vocab_token, action_vocab_action):
     selected_tokens = [action_vocab_token[idx] for idx in max_indices]
     selected_tokens = torch.stack(selected_tokens, dim=0)
     return selected_tokens
+
+def padding_collate(batch):
+    new_batch = []
+    for i in range(2): # 3 data types: im, action, prompt
+        #iterate except the last one: prompt
+        new_batch.append([item[i] for item in batch])
+        new_batch[i] = pad_sequence(new_batch[i], batch_first=True)
+    #add prompt separately without collated torch dataset
+    new_batch.append([item[2] for item in batch])
+    return new_batch
+
+def train_loop(train_dataset, test_dataset):
+    train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=padding_collate)
+    test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=padding_collate)
+
+    model = Renas(device).to(device)
+    model.train()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=LR)
+    scheduler1 = LinearLR(optimizer, start_factor=0.1, total_iters=LR_WARMUP_EPOCHS)
+    scheduler2 = CosineAnnealingLR(optimizer, T_max=LR_DECAY_EPOCHS, eta_min= LR/10)
+    scheduler3 = ConstantLR(optimizer, factor=LR/10, total_iters= 100000)
+    scheduler = SequentialLR(optimizer, schedulers=[scheduler1, scheduler2, scheduler3], milestones=[LR_WARMUP_EPOCHS, LR_WARMUP_EPOCHS+LR_DECAY_EPOCHS])
+    criterion = torch.nn.MSELoss()
+    ten_board_writer = SummaryWriter()
+
+    if os.path.isfile(os.path.join(WEIGHTS_DIR, LOAD_WEIGHTS)):
+        model_dict = model.state_dict()
+        pretrained_dict = torch.load(os.path.join(WEIGHTS_DIR, LOAD_WEIGHTS))
+        pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict and model_dict[k].size() == v.size()}
+        model_dict.update(pretrained_dict)
+        model.load_state_dict(model_dict)
+        del model_dict, pretrained_dict
+        print('weights loaded from file.')
+
+
+    epoch = 0
+    min_loss = 10000
+    while True:
+        epoch += 1
+        total_loss = 0
+        test_total_loss = 0
+        epoch_train_time_start = time.time()
+        optimizer.zero_grad()
+        for i, batch in enumerate(train_dataloader):
+            output = model(batch)
+            loss = criterion(output, batch[1].to(device))
+            #loss = criterion(output, batch[5].to(rank))+criterion(output[:,:,2:], batch[5][:,:,2:].to(rank))
+            #if i==0:
+            #    print('output: ',output)
+            #    print('target:', batch[1])
+            total_loss += loss
+            loss.backward()
+        optimizer.step()
+        scheduler.step()
+        average_loss = total_loss/len(train_dataloader)
+        ten_board_writer.add_scalar('Loss', average_loss.item(), epoch)
+            
+        print('\nEpoch: ', epoch,"  Training Loss:", average_loss.item())
+
+        with torch.no_grad():
+            for batch in test_dataloader:
+                output = model(batch)
+                test_loss = criterion(output, batch[1].to(device))
+                test_total_loss += test_loss
+            
+            
+            test_average_loss = test_total_loss/len(test_dataloader)   
+            ten_board_writer.add_scalar('Test_Loss', test_average_loss.item(), epoch)
+        epoch_train_time_end = time.time()
+        print('Epoch train time: ',epoch_train_time_end-epoch_train_time_start)
+
+
+        if epoch % CHECKPOINT_INTERVAL == 0:
+            torch.save(model.state_dict(), os.path.join(WEIGHTS_DIR, 'temp_'+ SAVE_WEIGHTS))
+            shutil.move(os.path.join(WEIGHTS_DIR, 'temp_'+ SAVE_WEIGHTS), os.path.join(WEIGHTS_DIR, SAVE_WEIGHTS))
+
+            if test_average_loss.item()<min_loss:
+                torch.save(model.state_dict(), os.path.join(WEIGHTS_DIR, 'temp_'+ 'early_'+ SAVE_WEIGHTS))
+                shutil.move(os.path.join(WEIGHTS_DIR, 'temp_'+'early_'+ SAVE_WEIGHTS), os.path.join(WEIGHTS_DIR, 'early_'+ SAVE_WEIGHTS))
+                min_loss = test_average_loss.item()
+                print('Early stopping with loss', min_loss, 'at the epoch', epoch)
+            print('weights saved')
+
+
+
 
 
 if __name__ == '__main__':
@@ -92,3 +271,5 @@ if __name__ == '__main__':
             prompt.append(p.strip())
 
     dataset =  StateActionPromptDataset(im, action, prompt)
+    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [1-TEST_PART, TEST_PART])
+    train_loop(train_dataset, test_dataset)
