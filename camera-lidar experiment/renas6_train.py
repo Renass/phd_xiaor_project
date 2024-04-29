@@ -127,7 +127,7 @@ class Renas(torch.nn.Module):
 
         tokens = self.gpt_model(inputs_embeds = tokens).last_hidden_state
         tokens = tokens[:, 0::2, :]
-        action_vocab_token = action_vocab_token.to(device)
+        action_vocab_token = action_vocab_token.to(self.device)
         tokens = self.tokens2similarities(tokens, action_vocab_token) 
         return tokens
     

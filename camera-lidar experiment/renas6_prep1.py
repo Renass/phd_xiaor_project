@@ -19,7 +19,7 @@ save as a new hdf
 '''
 
 
-DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/poses/poses_2024-04-25_15-00-52.h5'
+DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/tsa_combined.h5'
 
 def world_to_map(pose, resolution, origin):
     """
