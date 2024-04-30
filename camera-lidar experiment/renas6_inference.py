@@ -9,6 +9,7 @@ from geometry_msgs.msg import PoseStamped
 import h5py
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
+from diagnostic_msgs.msg import KeyValue
 
 '''
 Behavioral cloning Renas  transformer camera-lidar INFERENCE
@@ -91,7 +92,11 @@ def behav_clon_inference_thread():
                 publish_pose(driv_pub, output)
                 print('Model published action')
             else:
-                print('Model wants to end the episode')    
+                print('Model wants to end the episode')
+                task_msg = KeyValue()
+                task_msg.key = 'end_task'
+                task_msg.value = 'reason: success, end by model'
+                task_pub.publish(task_msg)    
             print('one_move time :', time.time() - start_time)
             time.sleep(1)
 
@@ -154,6 +159,7 @@ if __name__ == '__main__':
     )
 
     driv_pub = rospy.Publisher(ACTION_ROSTOPIC, PoseStamped, queue_size=1)
+    task_pub = rospy.Publisher('/task', KeyValue, queue_size=1)
     
     t1 = threading.Thread(target=rospy_thread)
     t2 = threading.Thread(target=behav_clon_inference_thread)
