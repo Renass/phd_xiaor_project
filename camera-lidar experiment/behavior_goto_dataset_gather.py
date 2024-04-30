@@ -29,8 +29,8 @@ end task:
 rostopic pub /task diagnostic_msgs/KeyValue "{key: 'end_task', value: 'done'}"
 '''
 
-BUFFER_SIZE = 20
-SAVE_DIR = 'TSA_dataset/sim'
+BUFFER_SIZE = 10
+SAVE_DIR = 'TSA_dataset/sim/test'
 
 #IMAGE_TOPIC = '/camera/rgb/image_raw'
 IMAGE_TOPIC = '/image_raw'
@@ -61,11 +61,7 @@ TARGET = [15.30, 21.31, -0.53, 0.85]
 #   [7.72, 7.84, -0.52, 0.85]
 #]
 STARTING_POINTS = [
-    [14.9, 5.7, 0.14, 0.99],
-    [10.67, 3.88, 0.19, 0.98],
-    [13.30, 10.87, 0.82, 0.57],
-    [3.96, 13.84, 0.20, 0.98],
-    [10.18, 17.47, -0.49, 0.87]
+    [14.9, 5.7, 0.14, 0.99]
 ]
 
 

@@ -13,6 +13,7 @@ from transformers import ViltImageProcessor
 import torch
 from tf.transformations import euler_from_quaternion
 import time
+import matplotlib.pyplot as plt
 
 '''
 Node to gather sequences of:

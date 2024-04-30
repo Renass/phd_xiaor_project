@@ -8,6 +8,7 @@ import numpy as np
 from geometry_msgs.msg import PoseStamped
 import h5py
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
 
 '''
 Behavioral cloning Renas  transformer camera-lidar INFERENCE
@@ -68,15 +69,21 @@ def behav_clon_inference_thread():
     while not rospy.is_shutdown():
         if traj_buffer.waiting == 'action':
             start_time = time.time()
-            im = (torch.from_numpy(np.stack(traj_buffer.states_buffer[-1], axis=0))).type(torch.float32).unsqueeze(0) 
-            action = torch.zeros((1,1,4)) 
+            im = (torch.from_numpy(np.stack(traj_buffer.states_buffer[-1], axis=0))).type(torch.float32).unsqueeze(0)
+            #plt.imshow(im[0][0].numpy().transpose(1,2,0))
+            #plt.show() 
+            action = torch.ones((1,1,4)) 
             if len(traj_buffer.actions_buffer[-1])>0:
                 action = torch.cat((torch.from_numpy(np.stack(traj_buffer.actions_buffer[-1], axis=0)), action[0]), dim=0).type(torch.float32).unsqueeze(0)
-            prompt = traj_buffer.task_buffer[-1]
+            if 'new_task' in traj_buffer.task_buffer[-1]:
+                prompt = [traj_buffer.task_buffer[-1]["new_task"]]
             #a_label = action2label_vocab(action[0], action_vocab_action)
             action = action2token_vocab(action[0], action_vocab_token, action_vocab_action) 
+            
             output = model((im, action, action, prompt), action_vocab_token)[-1][-1]
+            
             print(output)
+            #print('labels: ', a_label)
             _, output = torch.max(output, 0)
             output = action_vocab_action[output.cpu()]
 

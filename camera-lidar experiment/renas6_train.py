@@ -24,7 +24,7 @@ Actions for model are explored (im-prompt description) and set as tokens vocabul
 1. TEXT-Image(camera+map concatenation) encoding using ViLT (trainable) 
 2. (im_prompt)-(action) causal Transformer GPT 
 '''
-LR = 10e-6
+LR = 10e-7
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 
@@ -210,7 +210,9 @@ def train_loop(train_dataset, test_dataset):
         total_accuracy_test = [0, 0]
         for i, batch in enumerate(train_dataloader):
             output = model(batch, action_vocab_token)
-            
+            if i==0:
+                print('correct labels: ', batch[2])
+                print('model output: ', output)
             output_flat = output.view(-1, output.shape[-1])
             labels_flat = batch[2].to(device).view(-1)
             loss = criterion(output_flat, labels_flat)
