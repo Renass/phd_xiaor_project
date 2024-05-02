@@ -31,8 +31,8 @@ LR_DECAY_EPOCHS = 100
 DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/cola/tsa_combined_reworked.h5'
 POSES = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/poses/poses_2024-04-25_15-00-52_action_vocab.h5'
 TEST_PART = 0.2
-BATCH_SIZE = 5
-CHECKPOINT_INTERVAL = 50
+BATCH_SIZE = 1
+CHECKPOINT_INTERVAL = 10
 
 WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
 LOAD_WEIGHTS = 'renas6.pt'
@@ -89,7 +89,7 @@ class Renas(torch.nn.Module):
         self.vilt_model = ViltModel.from_pretrained("dandelin/vilt-b32-mlm")
         self.d_model = self.vilt_model.config.hidden_size
         for param in self.vilt_model.parameters():
-            param.requires_grad = True  
+            param.requires_grad = False  
 
         self.pos_enc = PositionalEncoding(d_model=self.d_model)
 
@@ -169,7 +169,7 @@ def padding_collate(batch):
     for i in range(3): # 4 data types: im, action, a_label, prompt
         #iterate except the last one: prompt
         new_batch.append([item[i] for item in batch])
-        new_batch[i] = pad_sequence(new_batch[i], batch_first=True)
+        new_batch[i] = pad_sequence(new_batch[i], batch_first=True, padding_value= 1.0)
     #add prompt separately without collated torch dataset
     new_batch.append([item[3] for item in batch])
     return new_batch
