@@ -24,11 +24,11 @@ Actions for model are explored (im-prompt description) and set as tokens vocabul
 1. TEXT-Image(camera+map concatenation) encoding using ViLT (trainable) 
 2. (im_prompt)-(action) causal Transformer GPT 
 '''
-LR = 10e-7
+LR = 10e-6
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 
-DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/tsa_combined_reworked.h5'
+DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/cola/tsa_combined_reworked.h5'
 POSES = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/poses/poses_2024-04-25_15-00-52_action_vocab.h5'
 TEST_PART = 0.2
 BATCH_SIZE = 5

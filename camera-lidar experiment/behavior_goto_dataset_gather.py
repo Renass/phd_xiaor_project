@@ -29,8 +29,8 @@ end task:
 rostopic pub /task diagnostic_msgs/KeyValue "{key: 'end_task', value: 'done'}"
 '''
 
-BUFFER_SIZE = 10
-SAVE_DIR = 'TSA_dataset/sim/test'
+BUFFER_SIZE = 18
+SAVE_DIR = 'TSA_dataset/sim'
 
 #IMAGE_TOPIC = '/camera/rgb/image_raw'
 IMAGE_TOPIC = '/image_raw'
@@ -39,20 +39,29 @@ IMAGE_TOPIC = '/image_raw'
 MAP_SERVICE = '/static_map'
 ACTION_ROSTOPIC = '/move_base_simple/goal'
 
-PROMPT = 'Go out of the 2A724 lab and turn right'
+PROMPT = 'Find a coke can, check near the firdge and after on the right part of hallway'
 
 #Sim 2A724_x3.yaml
 #Fridge target
-#TARGET = [14.9, 5.7, 0.14, 0.99]
-#STARTING_POINTS = [
-#    [15.9, 22.2, -0.97, 0.26],
-#    [19.0, 15.1, 0.85, 0.52],
-#    [0.0, 11.3, 0.27, 0.96],
-#    [10.56, 4.60, 0.03, 1.00],
-#    [8.23, 17.02, 0.02, 1.0]
-#]
+#[14.9, 5.7, 0.14, 0.99]
+TARGET = [
+    [14.9, 5.7, 0.14, 0.99],
+    [15.30, 21.31, -0.53, 0.85]
+]
+STARTING_POINTS = [
+    [15.9, 22.2, -0.97, 0.26],
+    #[19.0, 15.1, 0.85, 0.52],
+    [0.0, 11.3, 0.27, 0.96],
+    [10.56, 4.60, 0.03, 1.00],
+    [8.23, 17.02, 0.02, 1.0],
+    [-0.55, 10.63, 0.26, 0.96],
+    [4.38, 14.34, 0.29, 0.96],
+    [12.38, 19.73, -0.96, 0.28],
+    [12.17, 14.60, -0.56, 0.83],
+    [7.72, 7.84, -0.52, 0.85]
+]
 #out of lab and turn right target
-TARGET = [15.30, 21.31, -0.53, 0.85]
+#TARGET = [15.30, 21.31, -0.53, 0.85]
 #TARTING_POINTS = [
 #    [-0.55, 10.63, 0.26, 0.96],
 #    [4.38, 14.34, 0.29, 0.96],
@@ -60,9 +69,10 @@ TARGET = [15.30, 21.31, -0.53, 0.85]
 #    [12.17, 14.60, -0.56, 0.83],
 #   [7.72, 7.84, -0.52, 0.85]
 #]
-STARTING_POINTS = [
-    [14.9, 5.7, 0.14, 0.99]
-]
+
+
+
+
 
 
 # Real 2A724_april.yaml 
@@ -137,12 +147,13 @@ def save_thread():
             task_pub.publish(task_msg)
             while traj_buffer.waiting != 'action':
                 time.sleep(1)
-            publish_pose(driv_pub, TARGET)
-            time.sleep(1)
-            print('moving to the target')
-            while traj_buffer.nav_status != 3:
+            for i, target in enumerate(TARGET):
+                publish_pose(driv_pub, target)
                 time.sleep(1)
-            time.sleep(8)
+                print('moving to the target', i)
+                while traj_buffer.nav_status != 3:
+                    time.sleep(1)
+                time.sleep(8)
             task_msg.key = 'end_task'
             task_msg.value = 'done'
             task_pub.publish(task_msg)

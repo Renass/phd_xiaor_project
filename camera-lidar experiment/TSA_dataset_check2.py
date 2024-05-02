@@ -15,8 +15,10 @@ Check one trajectory from dataset as a slide show
 camera_image-map(costmap)-action slide show
 '''
 
-FILENAME = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/poses/poses_2024-04-25_15-00-52.h5'
-EPISODE_NUMBER = 0
+FILENAME = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/tsa-trajs_2024-05-01_21-04-10.h5'
+EPISODE_NUMBER = 1
+#pause before slides
+INTERVAL = 3000
 
 def update(frame):
     ax1.clear()
@@ -99,5 +101,5 @@ with open(mapinfo_filename, 'r') as file:
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
 action_text = fig.text(0.5, 0.05, '', ha='center', va='center', fontsize=12, color='red')
-ani = animation.FuncAnimation(fig, update, frames= len(im), repeat=False, interval=1000)
+ani = animation.FuncAnimation(fig, update, frames= len(im), repeat=False, interval=INTERVAL)
 plt.show()
