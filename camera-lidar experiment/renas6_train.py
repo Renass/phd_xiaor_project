@@ -312,6 +312,7 @@ if __name__ == '__main__':
 
     with h5py.File(DATASET, 'r') as hdf:
         num_episodes = len(hdf['states'])
+        print('num_episodes:', num_episodes)
         for i in range(num_episodes):
             episode_i = 'data_'+str(i)
             im_i = torch.from_numpy(hdf['states'][episode_i][:]).float()
