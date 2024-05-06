@@ -1,7 +1,9 @@
 import h5py
 import torch
 import pandas as pd
-from torch.nn.functional import cosine_similarity
+import torch.nn.functional as F
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 def load_embeddings(file_path):
     tokens = []
@@ -20,9 +22,13 @@ def load_embeddings(file_path):
     
     return tokens, actions
 
-# Compute cosine similarity matrix
 def compute_similarity_matrix(embeddings):
-    similarity_matrix = cosine_similarity(embeddings, embeddings)
+    # Expand embeddings along dim=0 and dim=1 to form a grid for comparison
+    expanded_embeddings_1 = embeddings.unsqueeze(1)  # Shape: (num_embeddings, 1, embedding_dim)
+    expanded_embeddings_2 = embeddings.unsqueeze(0)  # Shape: (1, num_embeddings, embedding_dim)
+
+    # Calculate cosine similarity along the last dimension (embedding_dim)
+    similarity_matrix = F.cosine_similarity(expanded_embeddings_1, expanded_embeddings_2, dim=-1)
     return similarity_matrix
 
 # Convert to DataFrame for visualization
@@ -30,11 +36,20 @@ def similarity_matrix_to_dataframe(matrix):
     df = pd.DataFrame(matrix.numpy())
     return df
 
-# Path to the uploaded HDF5 file
-file_path = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/poses/poses_2024-05-04_18-10-20_action_vocab.h5'
+EMBEDS_PATH = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/poses/poses_2024-05-04_18-10-20_action_vocab.h5'
 
-# Perform operations
-embeddings = load_embeddings(file_path)
-similarity_matrix = compute_similarity_matrix(embeddings)
-similarity_df = similarity_matrix_to_dataframe(similarity_matrix)
-similarity_df
+if __name__ == '__main__':
+    embeddings, _ = load_embeddings(EMBEDS_PATH)
+    similarity_matrix = compute_similarity_matrix(embeddings)
+    print(similarity_matrix)
+    similarity_df = similarity_matrix_to_dataframe(similarity_matrix)
+    similarity_df
+
+
+    # Create a heatmap for the similarity matrix
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(similarity_df, annot=True, fmt=".2f", cmap='coolwarm', cbar=True)
+    plt.title('Cosine Similarity Matrix Heatmap')
+    plt.xlabel('Embedding Index')
+    plt.ylabel('Embedding Index')
+    plt.show()
