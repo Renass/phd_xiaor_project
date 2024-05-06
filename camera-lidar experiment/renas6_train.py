@@ -8,7 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import SequentialLR, LinearLR, CosineAnnealingLR, ConstantLR
 import time
 import shutil
-from transformers import ViltProcessor, ViltModel, ViltImageProcessor
+from transformers import ViltProcessor, ViltModel
 import math
 from transformers import OpenAIGPTConfig, OpenAIGPTModel
 
@@ -24,7 +24,7 @@ Actions for model are explored (im-prompt description) and set as tokens vocabul
 1. TEXT-Image(camera+map concatenation) encoding using ViLT (trainable) 
 2. (im_prompt)-(action) causal Transformer GPT 
 '''
-LR = 10e-7
+LR = 10e-6
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 
@@ -96,7 +96,7 @@ class Renas(torch.nn.Module):
         self.im_prompt_enc_vector = EncodingVector(d_model=self.d_model)
         self.actions_enc_vector = EncodingVector(d_model=self.d_model)
         
-        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=20, n_head=12)
+        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=5, n_head=12)
         self.gpt_model = OpenAIGPTModel(self.gpt_config)
 
 

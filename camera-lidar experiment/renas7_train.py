@@ -85,7 +85,7 @@ class Renas(torch.nn.Module):
         self.ofa_model = OFAModel.from_pretrained(ckpt_dir, use_cache=False)
         self.d_model = self.ofa_model.config.d_model
         for param in self.ofa_model.parameters():
-            param.requires_grad = False  
+            param.requires_grad = True  
 
         self.pos_enc = PositionalEncoding(d_model=self.d_model)
 
