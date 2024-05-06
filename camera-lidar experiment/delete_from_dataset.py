@@ -12,10 +12,10 @@ State: im, map, costmap, pose, mapinfo, prompt
 Actions in ros: position(x,y) orientation quternions (z, w)
 '''
 
-DATASET_FOLDER = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/real'
-DATASET = 'tsa-trajs_2024-04-11_18-48-16.h5'
-NEW_DATASET = 'tsa-trajs_2024-04-11_18-48-16_edit.h5'
-DELETE_INSTANCE_WITH_IND = 0
+DATASET_FOLDER = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/cola'
+DATASET = 'tsa-trajs_2024-05-02_18-33-28.h5'
+NEW_DATASET = 'tsa-trajs_2024-05-02_18-33-28_e.h5'
+DELETE_INSTANCE_WITH_IND = 1
 
 
 

@@ -15,10 +15,10 @@ Check one trajectory from dataset as a slide show
 camera_image-map(costmap)-action slide show
 '''
 
-FILENAME = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/tsa-trajs_2024-05-01_21-04-10.h5'
-EPISODE_NUMBER = 1
+FILENAME = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/2A724_may/tsa-trajs_2024-05-04_23-38-03.h5'
+EPISODE_NUMBER = 0
 #pause before slides
-INTERVAL = 3000
+INTERVAL = 1000
 
 def update(frame):
     ax1.clear()
@@ -40,7 +40,7 @@ def update(frame):
         (mapinfo['origin']['position']['x'], 
         mapinfo['origin']['position']['y'])
     )
-    print(map_pose)
+    #print(map_pose)
     quaternion = [0, 0, pose[frame][2], pose[frame][3]]
     _, _, yaw = euler_from_quaternion(quaternion)
     yaw = -1*yaw

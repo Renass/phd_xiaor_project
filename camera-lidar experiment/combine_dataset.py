@@ -12,7 +12,7 @@ State: im, map, costmap, pose, mapinfo, prompt
 Actions in ros: position(x,y) orientation quternions (z, w)
 '''
 
-DATASET_FOLDER = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/cola'
+DATASET_FOLDER = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/2A724_may'
 COMBINED_FILE = 'tsa_combined.h5'
 
 
@@ -50,6 +50,7 @@ if __name__ == '__main__':
 
 
         for episode_file in episode_files:
+            print('working with: ', episode_file)
             episode_path = os.path.join(DATASET_FOLDER, episode_file)
             with h5py.File(episode_path, 'r') as hdf:
                 for group_name in dataset_counters.keys():

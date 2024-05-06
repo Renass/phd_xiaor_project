@@ -29,37 +29,37 @@ end task:
 rostopic pub /task diagnostic_msgs/KeyValue "{key: 'end_task', value: 'done'}"
 '''
 
-BUFFER_SIZE = 18
-SAVE_DIR = 'TSA_dataset/sim'
+BUFFER_SIZE = 5
+SAVE_DIR = 'TSA_dataset/real/2A724_may'
 
-#IMAGE_TOPIC = '/camera/rgb/image_raw'
-IMAGE_TOPIC = '/image_raw'
+IMAGE_TOPIC = '/camera/rgb/image_raw'
+#IMAGE_TOPIC = '/image_raw'
 
 #MAP_SERVICE = '/dynamic_map'
 MAP_SERVICE = '/static_map'
 ACTION_ROSTOPIC = '/move_base_simple/goal'
 
-PROMPT = 'Find a coke can, check near the firdge and after on the right part of hallway'
+PROMPT = 'go to the position out of the 2A724 lab facing left side of the corridor'
 
 #Sim 2A724_x3.yaml
 #Fridge target
 #[14.9, 5.7, 0.14, 0.99]
-TARGET = [
-    [14.9, 5.7, 0.14, 0.99],
-    [15.30, 21.31, -0.53, 0.85]
-]
-STARTING_POINTS = [
-    [15.9, 22.2, -0.97, 0.26],
-    #[19.0, 15.1, 0.85, 0.52],
-    [0.0, 11.3, 0.27, 0.96],
-    [10.56, 4.60, 0.03, 1.00],
-    [8.23, 17.02, 0.02, 1.0],
-    [-0.55, 10.63, 0.26, 0.96],
-    [4.38, 14.34, 0.29, 0.96],
-    [12.38, 19.73, -0.96, 0.28],
-    [12.17, 14.60, -0.56, 0.83],
-    [7.72, 7.84, -0.52, 0.85]
-]
+#TARGET = [
+#    [14.9, 5.7, 0.14, 0.99],
+#    [15.30, 21.31, -0.53, 0.85]
+#]
+#STARTING_POINTS = [
+#    [15.9, 22.2, -0.97, 0.26],
+#    #[19.0, 15.1, 0.85, 0.52],
+#    [0.0, 11.3, 0.27, 0.96],
+#    [10.56, 4.60, 0.03, 1.00],
+#    [8.23, 17.02, 0.02, 1.0],
+#    [-0.55, 10.63, 0.26, 0.96],
+#    [4.38, 14.34, 0.29, 0.96],
+#    [12.38, 19.73, -0.96, 0.28],
+#    [12.17, 14.60, -0.56, 0.83],
+#    [7.72, 7.84, -0.52, 0.85]
+#]
 #out of lab and turn right target
 #TARGET = [15.30, 21.31, -0.53, 0.85]
 #TARTING_POINTS = [
@@ -101,6 +101,18 @@ STARTING_POINTS = [
 #    [-3.58, -0.28, 0.85, 0.52]
 #]
 
+#Real 2A724_may
+STARTING_POINTS = [
+    [2.90, -1.65, -0.96, 0.28],
+    [2.91, -1.78, -0.46, 0.89],
+    [6.06, -5.67, -0.95, 0.31],
+    [6.14, -5.74, 0.86, 0.52],
+    [7.83, -7.43, 0.88, 0.48]
+]
+
+TARGET = [
+    [7.73, -7.41, 0.32, 0.95]
+]
 
 def publish_pose(publisher, action):
     goal_msg = PoseStamped()

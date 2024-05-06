@@ -17,23 +17,39 @@ text-image token from text-image model backbone for future classification
 import trajectories_gather6.py
 '''
 
-#IMAGE_TOPIC = '/camera/rgb/image_raw'
-IMAGE_TOPIC = '/image_raw'
+IMAGE_TOPIC = '/camera/rgb/image_raw'
+#IMAGE_TOPIC = '/image_raw'
 #MAP_SERVICE = '/dynamic_map'
 MAP_SERVICE = '/static_map'
 ACTION_ROSTOPIC = '/move_base_simple/goal'
 
-SAVE_DIR = 'TSA_dataset/nav/sim'
+SAVE_DIR = 'TSA_dataset/real/poses'
 
 #Sim 2A724_x3.yaml
-POSES = [ 
-    [14.9, 5.7, 0.14, 0.99],
-    [15.30, 21.31, -0.53, 0.85]
-]
+#POSES = [ 
+#    [14.9, 5.7, 0.14, 0.99],
+#    [15.30, 21.31, -0.53, 0.85]
+#]
+#DESCRIPTIONS = [
+#    'position facing fridge and rack',
+#    'position out of the 2A724 lab facing right side of the corridor'
+#]
 
+
+#Real 2A724_may.yaml
+POSES = [
+    [2.57, -8.01, -0.35, 0.94],
+    [7.86, -7.33, -0.96, 0.29],
+    [7.73, -7.41, 0.32, 0.95],
+    [3.47, -2.38, 0.88, 0.48],
+    [4.00, -3.88, -0.93, 0.36]
+]
 DESCRIPTIONS = [
     'position facing fridge and rack',
-    'position out of the 2A724 lab facing right side of the corridor'
+    'position out of the 2A724 lab facing right side of the corridor',
+    'position out of the 2A724 lab facing left side of the corridor',
+    'position facing Hamid working place',
+    'position facing inner hall to the sofa'
 ]
 
 def publish_pose(publisher, action):

@@ -29,10 +29,10 @@ end task:
 rostopic pub /task diagnostic_msgs/KeyValue "{key: 'end_task', value: 'done'}"
 '''
 
-#IMAGE_TOPIC = '/camera/rgb/image_raw'
-IMAGE_TOPIC = '/image_raw'
+IMAGE_TOPIC = '/camera/rgb/image_raw'
+#IMAGE_TOPIC = '/image_raw'
 
-LOAD_WEIGHTS = '/home/renas/pythonprogv2/phd_xiaor_project/weights/renas6.pt'
+LOAD_WEIGHTS = '/home/renas/pythonprogv2/phd_xiaor_project/weights/early_renas6.pt'
 
 #For SLAM:
 #MAP_SERVICE = '/dynamic_map'
@@ -43,8 +43,8 @@ MAP_SERVICE = '/static_map'
 BUFFER_SIZE = 1
 ACTION_ROSTOPIC = '/move_base_simple/goal'
 
-# Action options transfered to embeddings
-POSES = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/poses/poses_2024-04-25_15-00-52_action_vocab.h5'
+# Action options transfered to embeddings (files end with action_vocab.h5)
+POSES = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/poses/poses_2024-05-04_18-10-20_action_vocab.h5'
 
 def rospy_thread():
     while not rospy.is_shutdown():
