@@ -24,7 +24,7 @@ Actions for model are explored (im-prompt description) and set as tokens vocabul
 1. TEXT-Image(camera+map concatenation) encoding using ViLT (trainable) 
 2. (im_prompt)-(action) causal Transformer GPT 
 '''
-LR = 10e-7
+LR = 10e-6
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 

@@ -16,6 +16,9 @@ TEXT-Image(camera+map concatenation) (input reworked.h5) encoding using ViLT
 DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/poses/poses_2024-05-04_18-10-20_reworked.h5'
 BATCH_SIZE = 1
 
+WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
+LOAD_WEIGHTS = 'renas6.pt'
+
 class StatePromptDataset(Dataset):
     def __init__(self, im, prompt):
         self.im = im
@@ -87,6 +90,19 @@ if __name__ == '__main__':
     
     model = ActionCoder(device).to(device)
     model.eval()
+    
+    
+    if os.path.isfile(os.path.join(WEIGHTS_DIR, LOAD_WEIGHTS)):
+        model_dict = model.state_dict()
+        pretrained_dict = torch.load(os.path.join(WEIGHTS_DIR, LOAD_WEIGHTS))
+        pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict and model_dict[k].size() == v.size()}
+        model_dict.update(pretrained_dict)
+        model.load_state_dict(model_dict)
+        del model_dict, pretrained_dict
+        print('weights loaded from file.')
+    
+    
+    
     id = 0
     with h5py.File(DATASET[:-12]+"_action_vocab.h5", 'w') as new_hdf:
         new_hdf_actions_group = new_hdf.create_group('actions')
