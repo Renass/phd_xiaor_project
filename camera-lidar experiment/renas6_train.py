@@ -24,12 +24,12 @@ Actions for model are explored (im-prompt description) and set as tokens vocabul
 1. TEXT-Image(camera+map concatenation) encoding using ViLT (trainable) 
 2. (im_prompt)-(action) causal Transformer GPT 
 '''
-LR = 10e-6
+LR = 10e-7
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 
-DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/cola/tsa_combined_reworked.h5'
-POSES = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/poses/poses_2024-04-25_15-00-52_action_vocab.h5'
+DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/2A724_may/tsa_combined_reworked.h5'
+POSES = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/poses/poses_2024-05-04_18-10-20_action_vocab.h5'
 TEST_PART = 0.2
 BATCH_SIZE = 1
 CHECKPOINT_INTERVAL = 10
@@ -89,14 +89,14 @@ class Renas(torch.nn.Module):
         self.vilt_model = ViltModel.from_pretrained("dandelin/vilt-b32-mlm")
         self.d_model = self.vilt_model.config.hidden_size
         for param in self.vilt_model.parameters():
-            param.requires_grad = False  
+            param.requires_grad = True  
 
         self.pos_enc = PositionalEncoding(d_model=self.d_model)
 
         self.im_prompt_enc_vector = EncodingVector(d_model=self.d_model)
         self.actions_enc_vector = EncodingVector(d_model=self.d_model)
         
-        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=8, n_head=12)
+        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=20, n_head=12)
         self.gpt_model = OpenAIGPTModel(self.gpt_config)
 
 

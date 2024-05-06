@@ -8,7 +8,7 @@ import numpy as np
 '''
 Preparing action tokens vocabulary from action-prompt forward pass 
 
-TEXT-Image(camera+map concatenation) (reworked.h5) encoding using ViLT  
+TEXT-Image(camera+map concatenation) (input reworked.h5) encoding using ViLT  
 '''
 
 #EXPLORING POSES TO CODE AS ACTION OPTIONS 
