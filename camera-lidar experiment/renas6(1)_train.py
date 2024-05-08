@@ -23,8 +23,8 @@ Actions for model are explored (im-prompt description) and set as tokens vocabul
 
 1. TEXT-Image(camera+map concatenation) encoding using ViLT (trainable) 
 2. (im_prompt)-(action) causal Transformer GPT
-Loss: output token compared to action embedding with cosine similarity and digits go to CrossEntropyLoss 
-Similarity metric: Cosine Similarity
+Loss: MSE of output embedding and right action embedding 
+Similarity metric: Eucledean L2
 '''
 LR = 10e-6
 LR_WARMUP_EPOCHS = 5 
@@ -34,7 +34,7 @@ DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/2A724_may
 POSES = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/poses/poses_2024-05-04_18-10-20_action_vocab.h5'
 TEST_PART = 0.2
 BATCH_SIZE = 1
-CHECKPOINT_INTERVAL = 10
+CHECKPOINT_INTERVAL = 50
 
 WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
 LOAD_WEIGHTS = 'renas6.pt'
@@ -98,12 +98,12 @@ class Renas(torch.nn.Module):
         self.im_prompt_enc_vector = EncodingVector(d_model=self.d_model)
         self.actions_enc_vector = EncodingVector(d_model=self.d_model)
         
-        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=5, n_head=12)
+        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=20, n_head=12)
         self.gpt_model = OpenAIGPTModel(self.gpt_config)
 
 
 
-    def forward(self, batch, action_vocab_token):
+    def forward(self, batch):
         im, action, _, prompt = batch
         i1, i2, i3, i4, i5 = im.size()
         im = im.view(i1*i2, i3, i4, i5)
@@ -129,13 +129,11 @@ class Renas(torch.nn.Module):
 
         tokens = self.gpt_model(inputs_embeds = tokens).last_hidden_state
         tokens = tokens[:, 0::2, :]
-        action_vocab_token = action_vocab_token.to(self.device)
-        tokens = self.tokens2similarities(tokens, action_vocab_token) 
         return tokens
     
-    def tokens2similarities(self, tokens, action_vocab_token):
-        batch_size, seq_length, _ = tokens.shape
-        tokens = tokens.reshape(batch_size * seq_length, 1, self.d_model)
+def tokens2similarities(tokens, action_vocab_token):
+        batch_size, seq_length, d_model = tokens.shape
+        tokens = tokens.reshape(batch_size * seq_length, 1, d_model)
         action_vocab_token = action_vocab_token.unsqueeze(0)
         similarity_scores = F.cosine_similarity(tokens, action_vocab_token, dim=2)
         similarity_scores = similarity_scores.reshape(batch_size, seq_length, -1)
@@ -187,7 +185,7 @@ def train_loop(train_dataset, test_dataset):
     scheduler2 = CosineAnnealingLR(optimizer, T_max=LR_DECAY_EPOCHS, eta_min= LR/10)
     scheduler3 = ConstantLR(optimizer, factor=LR/10, total_iters= 100000)
     scheduler = SequentialLR(optimizer, schedulers=[scheduler1, scheduler2, scheduler3], milestones=[LR_WARMUP_EPOCHS, LR_WARMUP_EPOCHS+LR_DECAY_EPOCHS])
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = torch.nn.MSELoss()
     ten_board_writer = SummaryWriter()
 
     if os.path.isfile(os.path.join(WEIGHTS_DIR, LOAD_WEIGHTS)):
@@ -211,15 +209,17 @@ def train_loop(train_dataset, test_dataset):
         total_accuracy_train = [0, 0]
         total_accuracy_test = [0, 0]
         for i, batch in enumerate(train_dataloader):
-            output = model(batch, action_vocab_token)
-            if i==0:
-                print('correct labels: ', batch[2])
-                print('model output: ', output)
-            output_flat = output.view(-1, output.shape[-1])
-            labels_flat = batch[2].to(device).view(-1)
-            loss = criterion(output_flat, labels_flat)
+            output = model(batch)
+            loss = criterion(output, batch[1].to(device))
             total_loss += loss
             loss.backward()
+            output = tokens2similarities(output, action_vocab_token.to(device))
+            if i==0:
+                print('correct labels: ', batch[2])
+                print('model prediction: ', output.data)
+            
+            output_flat = output.view(-1, output.shape[-1])
+            labels_flat = batch[2].to(device).view(-1)
             _, predicted_classes = torch.max(output_flat, 1)
             #print('Debugging: predicted classes:',predicted_classes)
             total_accuracy_train[0] += (predicted_classes == labels_flat).float().sum()
@@ -235,11 +235,13 @@ def train_loop(train_dataset, test_dataset):
         #Test part
         with torch.no_grad():
             for batch in test_dataloader:
-                output = model(batch, action_vocab_token)
+                output = model(batch)
+                test_loss = criterion(output, batch[1].to(device))
+                test_total_loss += test_loss
+                output = tokens2similarities(output, action_vocab_token.to(device))
+                
                 output_flat = output.view(-1, output.shape[-1])
                 labels_flat = batch[2].to(device).view(-1)
-                test_loss = criterion(output_flat, labels_flat)
-                test_total_loss += test_loss
                 _, predicted_classes = torch.max(output_flat, 1)
                 total_accuracy_test[0] += (predicted_classes == labels_flat).float().sum()
                 total_accuracy_test[1] += labels_flat.size(0) 

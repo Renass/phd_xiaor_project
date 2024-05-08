@@ -17,7 +17,7 @@ DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/poses/pos
 BATCH_SIZE = 1
 
 WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
-LOAD_WEIGHTS = 'renas6.pt'
+LOAD_WEIGHTS = 'none'
 
 class StatePromptDataset(Dataset):
     def __init__(self, im, prompt):
