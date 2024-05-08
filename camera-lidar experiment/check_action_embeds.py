@@ -31,6 +31,14 @@ def compute_similarity_matrix(embeddings):
     similarity_matrix = F.cosine_similarity(expanded_embeddings_1, expanded_embeddings_2, dim=-1)
     return similarity_matrix
 
+def compute_euclidean_distance_matrix(embeddings):
+    expanded_embeddings_1 = embeddings.unsqueeze(1)  # Shape: (num_embeddings, 1, embedding_dim)
+    expanded_embeddings_2 = embeddings.unsqueeze(0)  # Shape: (1, num_embeddings, embedding_dim)
+
+    # Calculate Euclidean distance along the last dimension (embedding_dim)
+    distance_matrix = torch.norm(expanded_embeddings_1 - expanded_embeddings_2, dim=-1)
+    return distance_matrix
+
 # Convert to DataFrame for visualization
 def similarity_matrix_to_dataframe(matrix):
     df = pd.DataFrame(matrix.numpy())
@@ -41,15 +49,25 @@ EMBEDS_PATH = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/poses
 if __name__ == '__main__':
     embeddings, _ = load_embeddings(EMBEDS_PATH)
     similarity_matrix = compute_similarity_matrix(embeddings)
-    print(similarity_matrix)
+    print('cosine similarity matrix: ', similarity_matrix)
     similarity_df = similarity_matrix_to_dataframe(similarity_matrix)
-    similarity_df
+
+    distance_matrix = compute_euclidean_distance_matrix(embeddings)
+    distance_df = similarity_matrix_to_dataframe(distance_matrix)
+    print('Eucledean distance matrix: ', distance_matrix)
 
 
     # Create a heatmap for the similarity matrix
     plt.figure(figsize=(10, 8))
     sns.heatmap(similarity_df, annot=True, fmt=".2f", cmap='coolwarm', cbar=True)
     plt.title('Cosine Similarity Matrix Heatmap')
+    plt.xlabel('Embedding Index')
+    plt.ylabel('Embedding Index')
+    plt.show()
+
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(distance_df, annot=True, fmt=".2f", cmap='coolwarm', cbar=True)
+    plt.title('Euclidean Distance Matrix Heatmap')
     plt.xlabel('Embedding Index')
     plt.ylabel('Embedding Index')
     plt.show()
