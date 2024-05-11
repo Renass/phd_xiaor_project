@@ -4,18 +4,20 @@ import os
 from torch.utils.data import Dataset, DataLoader
 from transformers import ViltProcessor, ViltModel
 import numpy as np
-from transformers import OFATokenizer, OFAModel
 
 '''
 Preparing action tokens vocabulary from action-prompt forward pass 
 
-TEXT-Image(camera+map concatenation) (input reworked.h5) encoding using OFA  
+TEXT-Image(camera+map concatenation) (input reworked.h5) encoding using ViLT  
 '''
 
 #EXPLORING POSES TO CODE AS ACTION OPTIONS 
 #(Reworked h5 required) 
 DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/poses/poses_2024-05-04_18-10-20_reworked.h5'
 BATCH_SIZE = 1
+
+WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
+LOAD_WEIGHTS = 'none'
 
 class StatePromptDataset(Dataset):
     def __init__(self, im, prompt):
@@ -53,7 +55,6 @@ class ActionCoder(torch.nn.Module):
         return tokens
 
 if __name__ == '__main__':
-    ckpt_dir = '/home/renas/pythonprogv2/phd_xiaor_project/OFA-base'
     if torch.cuda.is_available():
         for i in range(torch.cuda.device_count()):
             device = torch.device('cuda:0')
@@ -64,15 +65,6 @@ if __name__ == '__main__':
         device = torch.device('cpu')
     print('Current device: ',device)
 
-    
-    
-    tokenizer = OFATokenizer.from_pretrained(ckpt_dir)
-    model = OFAModel.from_pretrained(ckpt_dir, use_cache=False)
-    model = model.to(device)
-    model.eval()
-    
-    
-    
     im = []
     action = []
     prompt = []
@@ -83,7 +75,7 @@ if __name__ == '__main__':
             episode_i = 'data_'+str(i)
             im_i = torch.from_numpy(hdf['states'][episode_i][:]).float()
             #Every episode should contain only 1 image desribing action result
-            im_i= im_i[0]
+            im_i= im_i[0].unsqueeze(0)
             im.append(im_i)
             actions_i = hdf['actions'][episode_i][:]
             action.append(actions_i)
@@ -92,26 +84,32 @@ if __name__ == '__main__':
     print(prompt_filename)
     with open(prompt_filename, 'r') as file:
         for p in file:
-            p = p.strip()
-            p = tokenizer([p], return_tensors="pt").input_ids.squeeze(0)
-            prompt.append(p)
-            
+            prompt.append(p.strip())
     dataset =  StatePromptDataset(im, prompt)
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False)
     
-
+    model = ActionCoder(device).to(device)
+    model.eval()
+    
+    
+    if os.path.isfile(os.path.join(WEIGHTS_DIR, LOAD_WEIGHTS)):
+        model_dict = model.state_dict()
+        pretrained_dict = torch.load(os.path.join(WEIGHTS_DIR, LOAD_WEIGHTS))
+        pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict and model_dict[k].size() == v.size()}
+        model_dict.update(pretrained_dict)
+        model.load_state_dict(model_dict)
+        del model_dict, pretrained_dict
+        print('weights loaded from file.')
+    
+    
+    
     id = 0
     with h5py.File(DATASET[:-12]+"_action_vocab.h5", 'w') as new_hdf:
         new_hdf_actions_group = new_hdf.create_group('actions')
         new_hdf_tokens_group = new_hdf.create_group('tokens')
         with torch.no_grad():
             for batch in dataloader:
-                print(batch[0].shape)
-                print(batch[1].shape)
-                tokens = model.encoder.forward(input_ids = batch[1].to(device), patch_images=batch[0].to(device))
-                tokens = tokens.last_hidden_state
-                tokens = torch.mean(tokens, dim=1)
-                print('here', tokens.shape)
+                tokens = model(batch)
                 for i in range(batch[0].shape[0]):
                     new_hdf_actions_group.create_dataset('data_'+str(id), data=action[id], dtype = np.float32, compression = 'gzip')
                     new_hdf_tokens_group.create_dataset('data_'+str(id), data=tokens[i].cpu(), dtype = np.float32, compression = 'gzip')

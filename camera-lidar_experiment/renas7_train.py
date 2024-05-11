@@ -28,8 +28,8 @@ LR = 10e-6
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 
-DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/2A724_may/tsa_combined_reworked.h5'
-POSES = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/poses/poses_2024-05-04_18-10-20_action_vocab.h5'
+DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/cola/tsa_combined_reworked.h5'
+POSES = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/poses/poses_2024-04-25_15-00-52_action_vocab.h5'
 TEST_PART = 0.2
 BATCH_SIZE = 1
 CHECKPOINT_INTERVAL = 10
@@ -85,7 +85,7 @@ class Renas(torch.nn.Module):
         self.ofa_model = OFAModel.from_pretrained(ckpt_dir, use_cache=False)
         self.d_model = self.ofa_model.config.d_model
         for param in self.ofa_model.parameters():
-            param.requires_grad = True  
+            param.requires_grad = False  
 
         self.pos_enc = PositionalEncoding(d_model=self.d_model)
 
