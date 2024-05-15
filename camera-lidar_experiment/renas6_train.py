@@ -37,7 +37,7 @@ BATCH_SIZE = 1
 CHECKPOINT_INTERVAL = 50
 
 WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
-LOAD_WEIGHTS = 'none'
+LOAD_WEIGHTS = 'renas6.pt'
 SAVE_WEIGHTS = 'renas6.pt'
 
 class StateActionPromptDataset(Dataset):
@@ -98,7 +98,7 @@ class Renas(torch.nn.Module):
         self.im_prompt_enc_vector = EncodingVector(d_model=self.d_model)
         self.actions_enc_vector = EncodingVector(d_model=self.d_model)
         
-        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=5, n_head=12)
+        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=6, n_head=12)
         self.gpt_model = OpenAIGPTModel(self.gpt_config)
 
         self.q_weights = torch.nn.Linear(self.d_model, self.d_model)
