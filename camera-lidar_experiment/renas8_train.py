@@ -11,6 +11,7 @@ import shutil
 from transformers import ViltProcessor, ViltModel
 import math
 from transformers import OpenAIGPTConfig, OpenAIGPTModel
+from transformers import InstructBlipProcessor, InstructBlipForConditionalGeneration, InstructBlipConfig
 
 '''
 Behavioral cloning Renas  transformer camera-lidar TRAIN LOOP
@@ -21,8 +22,9 @@ states organized as sequences - episodes
 Actions in ros: position(x,y) orientation quternions (z, w)
 Actions for model are explored (im-prompt description) and set as tokens vocabulary
 
-1. TEXT-Image(camera+map concatenation) encoding using ViLT (trainable) 
+1. TEXT-Image(camera+map concatenation) encoding using InstructBLIP (frozen) 
 2. (im_prompt)-(action) causal Transformer GPT
+3. InstructBLIP (frozen) decoder
 Loss: cross-attention metrics going to CrossEntropyLoss 
 Similarity metric: First half of cross-attention
 '''
@@ -37,8 +39,8 @@ BATCH_SIZE = 1
 CHECKPOINT_INTERVAL = 10
 
 WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
-LOAD_WEIGHTS = 'renas6.pt'
-SAVE_WEIGHTS = 'renas6.pt'
+LOAD_WEIGHTS = 'renas8.pt'
+SAVE_WEIGHTS = 'renas8.pt'
 
 class StateActionPromptDataset(Dataset):
     def __init__(self, im, action, a_label, prompt):
@@ -82,23 +84,24 @@ class Renas(torch.nn.Module):
     def __init__(self, device):
         super(Renas, self).__init__()
         self.device = device
+        self.blip_config = InstructBlipConfig.from_pretrained("Salesforce/instructblip-flan-t5-xl")
+        self.d_model = self.blip_config.text_config.d_model
         
-        self.processor = ViltProcessor.from_pretrained("dandelin/vilt-b32-mlm")
-        self.processor.current_processor.do_rescale = False
-        self.processor.current_processor.do_resize = False
-        self.processor.current_processor.do_normalize = False
+        self.processor = InstructBlipProcessor.from_pretrained("Salesforce/instructblip-flan-t5-xl")
+        self.processor.do_rescale = False
+        self.processor.do_resize = False
+        self.processor.do_normalize = False
 
-        self.vilt_model = ViltModel.from_pretrained("dandelin/vilt-b32-mlm")
-        self.d_model = self.vilt_model.config.hidden_size
-        for param in self.vilt_model.parameters():
-            param.requires_grad = True  
+        self.blip_model = InstructBlipForConditionalGeneration.from_pretrained("Salesforce/instructblip-flan-t5-xl", load_in_8bit=True)
+        for param in self.blip_model.parameters():
+            param.requires_grad = False 
 
         self.pos_enc = PositionalEncoding(d_model=self.d_model)
 
         self.im_prompt_enc_vector = EncodingVector(d_model=self.d_model)
         self.actions_enc_vector = EncodingVector(d_model=self.d_model)
         
-        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=6, n_head=12)
+        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=8, n_head=32)
         self.gpt_model = OpenAIGPTModel(self.gpt_config)
 
         self.q_weights = torch.nn.Linear(self.d_model, self.d_model)
@@ -114,8 +117,16 @@ class Renas(torch.nn.Module):
         prompt = [prompt for prompt in prompt for _ in range(i2)]
 
 
-        im_prompt = self.processor(images=im, text=prompt, return_tensors="pt", padding=True).to(self.device)
-        im_prompt = self.vilt_model(**im_prompt).pooler_output.unsqueeze(0).view(i1, i2, self.d_model)
+        im_prompt = self.processor(images=im, text=prompt, return_tensors="pt", padding=True).to(self.device, torch.float16)
+        im_prompt = {key: val.to(self.device) for key, val in im_prompt.items()}
+        batch_size = im_prompt['input_ids'].size(0)
+        # Initialize decoder_input_ids with the BOS token
+        if 'decoder_input_ids' not in im_prompt:
+            im_prompt['decoder_input_ids'] = torch.LongTensor([self.blip_config.text_config.bos_token_id]).repeat(batch_size, 1).to(im_prompt['input_ids'].device)
+        
+        im_prompt = self.blip_model(**im_prompt, return_dict=True)
+        im_prompt = im_prompt.language_model_outputs.encoder_last_hidden_state
+        im_prompt = torch.mean(im_prompt, dim=1).unsqueeze(1).view(i1, i2, self.d_model)
         
         actions = action.to(self.device)
         
@@ -310,8 +321,9 @@ if __name__ == '__main__':
             action_vocab_token.append(torch.from_numpy(hdf2['tokens']['data_'+str(i)][:]))
             action_vocab_action.append(torch.from_numpy(hdf2['actions']['data_'+str(i)][:])[0])
         action_vocab_token = torch.stack(action_vocab_token, dim=0)
+        d_model = action_vocab_token.shape[1]
         #additional end_token of ones
-        action_vocab_token = torch.cat((action_vocab_token, torch.ones((1, 768))))
+        action_vocab_token = torch.cat((action_vocab_token, torch.ones((1, d_model))))
 
         action_vocab_action = torch.stack(action_vocab_action, dim=0)
         #additional end_token of ones

@@ -44,7 +44,7 @@ def similarity_matrix_to_dataframe(matrix):
     df = pd.DataFrame(matrix.numpy())
     return df
 
-EMBEDS_PATH = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/poses/poses_2024-04-25_15-00-52_action_vocab.h5'
+EMBEDS_PATH = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/poses/poses_2024-05-04_18-10-20_action_vocab.h5'
 
 if __name__ == '__main__':
     embeddings, _ = load_embeddings(EMBEDS_PATH)
