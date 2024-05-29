@@ -24,21 +24,21 @@ Actions for model are explored (im-prompt description) and set as tokens vocabul
 1. TEXT-Image(camera+map concatenation) encoding using ViLT (trainable) 
 2. (im_prompt)-(action) causal Transformer GPT
 Loss: cross-attention metrics going to CrossEntropyLoss 
-Similarity metric: First half of cross-attention
+Similarity metric: Cosine Similarity
 '''
-LR = 10e-7
+LR = 10e-6
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 
-DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/2A724_may/tsa_combined_reworked.h5'
-POSES = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/poses/poses_2024-05-04_18-10-20_action_vocab.h5'
+DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/tsa_combined_reworked.h5'
+POSES = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/poses/poses_2024-04-25_15-00-52_action_vocab.h5'
 TEST_PART = 0.2
 BATCH_SIZE = 1
 CHECKPOINT_INTERVAL = 10
 
 WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
-LOAD_WEIGHTS = 'renas6_apiems_real_8layers.pt'
-SAVE_WEIGHTS = 'renas6_apiems_real_9layers.pt'
+LOAD_WEIGHTS = 'renas6_apiems_virtual.pt'
+SAVE_WEIGHTS = 'none'
 
 class StateActionPromptDataset(Dataset):
     def __init__(self, im, action, a_label, prompt):
@@ -98,11 +98,11 @@ class Renas(torch.nn.Module):
         self.im_prompt_enc_vector = EncodingVector(d_model=self.d_model)
         self.actions_enc_vector = EncodingVector(d_model=self.d_model)
         
-        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=9, n_head=12)
+        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=6, n_head=12)
         self.gpt_model = OpenAIGPTModel(self.gpt_config)
 
-        self.q_weights = torch.nn.Linear(self.d_model, self.d_model)
-        self.k_weights = torch.nn.Linear(self.d_model, self.d_model)
+        #self.q_weights = torch.nn.Linear(self.d_model, self.d_model)
+        #self.k_weights = torch.nn.Linear(self.d_model, self.d_model)
 
 
 
@@ -132,12 +132,14 @@ class Renas(torch.nn.Module):
 
         tokens = self.gpt_model(inputs_embeds = tokens).last_hidden_state
         tokens = tokens[:, 0::2, :]
-        tokens = self.q_weights(tokens)
+        #tokens = self.q_weights(tokens)
         action_vocab_token = action_vocab_token.to(self.device)
-        action_vocab_token = self.k_weights(action_vocab_token).unsqueeze(0)
-        attention_scores = torch.matmul(tokens, action_vocab_token.transpose(1, 2))
-        return attention_scores
-    
+        #action_vocab_token = self.k_weights(action_vocab_token).unsqueeze(0)
+        #attention_scores = torch.matmul(tokens, action_vocab_token.transpose(1, 2))
+        tokens = self.tokens2similarities(tokens, action_vocab_token)
+        #return attention_scores
+        return tokens
+
     def tokens2similarities(self, tokens, action_vocab_token):
         batch_size, seq_length, _ = tokens.shape
         tokens = tokens.reshape(batch_size * seq_length, 1, self.d_model)
@@ -219,7 +221,8 @@ def train_loop(train_dataset, test_dataset):
             output = model(batch, action_vocab_token)
             if i==0:
                 print('correct labels: ', batch[2])
-                print('model output: ', F.softmax(output, dim=-1))
+                print('model output: ', output)
+                #print('model output: ', F.softmax(output, dim=-1))
             output_flat = output.view(-1, output.shape[-1])
             labels_flat = batch[2].to(device).view(-1)
             loss = criterion(output_flat, labels_flat)
