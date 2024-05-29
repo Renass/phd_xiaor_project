@@ -29,7 +29,7 @@ end task:
 rostopic pub /task diagnostic_msgs/KeyValue "{key: 'end_task', value: 'done'}"
 '''
 
-BUFFER_SIZE = 5
+BUFFER_SIZE = 7
 SAVE_DIR = 'TSA_dataset/real/2A724_may'
 
 IMAGE_TOPIC = '/camera/rgb/image_raw'
@@ -39,7 +39,7 @@ IMAGE_TOPIC = '/camera/rgb/image_raw'
 MAP_SERVICE = '/static_map'
 ACTION_ROSTOPIC = '/move_base_simple/goal'
 
-PROMPT = 'go to the position out of the 2A724 lab facing left side of the corridor'
+PROMPT = 'go outside of the lab and turn right'
 
 #Sim 2A724_x3.yaml
 #Fridge target
@@ -107,11 +107,23 @@ STARTING_POINTS = [
     [2.91, -1.78, -0.46, 0.89],
     [6.06, -5.67, -0.95, 0.31],
     [6.14, -5.74, 0.86, 0.52],
-    [7.83, -7.43, 0.88, 0.48]
+    [7.83, -7.43, 0.88, 0.48],
+    [3.79, -7.40, 0.36, 0.93],
+    [6.05, -5.69, -0.34, 0.94]
 ]
 
+
+
+#TARGET = [
+#    fridgge
+#    [2.57, -8.01, -0.35, 0.94]
+#]
+#TARGET = [
+#    sofa
+#   [4.00, -3.88, -0.93, 0.36]
+#]
 TARGET = [
-    [7.73, -7.41, 0.32, 0.95]
+    [7.86, -7.33, -0.96, 0.29]
 ]
 
 def publish_pose(publisher, action):
