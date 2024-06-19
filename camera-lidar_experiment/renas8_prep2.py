@@ -40,11 +40,11 @@ class RenasCoder(torch.nn.Module):
         self.d_model = self.blip_config.text_config.d_model
         
         self.processor = InstructBlipProcessor.from_pretrained("Salesforce/instructblip-flan-t5-xl")
-        self.processor.do_rescale = False
-        self.processor.do_resize = False
-        self.processor.do_normalize = False
+        self.processor.image_processor.do_rescale = False
+        self.processor.image_processor.do_resize = True
+        self.processor.image_processor.do_normalize = False
 
-        self.blip_model = InstructBlipForConditionalGeneration.from_pretrained("Salesforce/instructblip-flan-t5-xl", load_in_8bit=True)
+        self.blip_model = InstructBlipForConditionalGeneration.from_pretrained("Salesforce/instructblip-flan-t5-xl", torch_dtype=torch.float16)
         for param in self.blip_model.parameters():
             param.requires_grad = False 
 

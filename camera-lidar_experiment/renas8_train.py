@@ -28,7 +28,7 @@ Actions for model are explored (im-prompt description) and set as tokens vocabul
 Loss: cross-attention metrics going to CrossEntropyLoss 
 Similarity metric: First half of cross-attention
 '''
-LR = 10e-6
+LR = 10e-14
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 
@@ -36,10 +36,10 @@ DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/2A724_may
 POSES = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/poses/poses_2024-05-04_18-10-20_action_vocab.h5'
 TEST_PART = 0.2
 BATCH_SIZE = 1
-CHECKPOINT_INTERVAL = 10
+CHECKPOINT_INTERVAL = 50
 
 WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
-LOAD_WEIGHTS = 'renas8.pt'
+LOAD_WEIGHTS = 'none'
 SAVE_WEIGHTS = 'renas8.pt'
 
 class StateActionPromptDataset(Dataset):
@@ -88,11 +88,11 @@ class Renas(torch.nn.Module):
         self.d_model = self.blip_config.text_config.d_model
         
         self.processor = InstructBlipProcessor.from_pretrained("Salesforce/instructblip-flan-t5-xl")
-        self.processor.do_rescale = False
-        self.processor.do_resize = False
-        self.processor.do_normalize = False
+        self.processor.image_processor.do_rescale = False
+        self.processor.image_processor.do_resize = True
+        self.processor.image_processor.do_normalize = False
 
-        self.blip_model = InstructBlipForConditionalGeneration.from_pretrained("Salesforce/instructblip-flan-t5-xl", load_in_8bit=True)
+        self.blip_model = InstructBlipForConditionalGeneration.from_pretrained("Salesforce/instructblip-flan-t5-xl", torch_dtype=torch.float16)
         for param in self.blip_model.parameters():
             param.requires_grad = False 
 
@@ -101,7 +101,7 @@ class Renas(torch.nn.Module):
         self.im_prompt_enc_vector = EncodingVector(d_model=self.d_model)
         self.actions_enc_vector = EncodingVector(d_model=self.d_model)
         
-        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=8, n_head=32)
+        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=12, n_head=32)
         self.gpt_model = OpenAIGPTModel(self.gpt_config)
 
         self.q_weights = torch.nn.Linear(self.d_model, self.d_model)

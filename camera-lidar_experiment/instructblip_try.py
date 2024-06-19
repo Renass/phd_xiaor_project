@@ -3,11 +3,11 @@ import torch
 from PIL import Image
 import requests
 
-model = InstructBlipForConditionalGeneration.from_pretrained("Salesforce/instructblip-flan-t5-xl", load_in_4bit=True)
+model = InstructBlipForConditionalGeneration.from_pretrained("Salesforce/instructblip-flan-t5-xl", torch_dtype=torch.float16)
 processor = InstructBlipProcessor.from_pretrained("Salesforce/instructblip-flan-t5-xl")
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-#model.to(device)
+model.to(device)
 model.eval()
 #print(model.language_model)
 #print(model.get_output_embeddings)
