@@ -14,10 +14,10 @@ TEXT-Image(camera+map concatenation) (input reworked.h5) encoding using Instruct
 
 #EXPLORING POSES TO CODE AS ACTION OPTIONS 
 #(Reworked h5 required) 
-DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/poses/poses_2024-05-04_18-10-20_reworked.h5'
+DATASET = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/poses/poses_2024-05-04_18-10-20_reworked.h5'
 BATCH_SIZE = 1
 
-WEIGHTS_DIR = '/home/renas/pythonprogv2/phd_xiaor_project/weights'
+WEIGHTS_DIR = '/data/renas/pythonprogv2/phd_xiaor_project/weights'
 LOAD_WEIGHTS = 'none'
 
 class StatePromptDataset(Dataset):

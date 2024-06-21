@@ -15,9 +15,9 @@ Actions in ros: position(x,y) orientation quternions (z, w)
 Actions for model are explored (im-prompt description) and set as tokens vocabulary
 '''
 
-DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/2A724_may/tsa_combined_reworked.h5'
-EPISODE_NUM = 40
-PROMPT = 'Find a green cone'
+DATASET = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/cola/tsa_combined_reworked.h5'
+EPISODE_NUM = 0
+PROMPT = 'Annotation: robot gets navigation tasks, you will see the last image from its camera. so create an answer from his face. Task: Find a coke can.'
 
 class SimpleDataset(Dataset):
     def __init__(self, im):
@@ -31,12 +31,9 @@ class SimpleDataset(Dataset):
 if __name__ == '__main__':
     model = InstructBlipForConditionalGeneration.from_pretrained("Salesforce/instructblip-flan-t5-xl", torch_dtype=torch.float16)
     processor = InstructBlipProcessor.from_pretrained("Salesforce/instructblip-flan-t5-xl")
-    print(dir(processor.image_processor))
-    print(processor.image_processor.do_rescale)
     processor.image_processor.do_rescale = False
     processor.image_processor.do_resize = True
     processor.image_processor.do_normalize = False
-    print(processor.image_processor.do_rescale)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model.to(device)
@@ -55,8 +52,7 @@ if __name__ == '__main__':
     prompt = PROMPT
     image = im[EPISODE_NUM]
     image = image[-1]
-    print('here')
-    print(image.shape)
+    print('Image shape: ', image.shape)
 
     inputs = processor(images=image, text=prompt, return_tensors="pt").to(device, torch.float16)
     inputs = {key: val.to(device) for key, val in inputs.items()}
@@ -71,16 +67,16 @@ if __name__ == '__main__':
 
 
     outputs = model.forward(**inputs, return_dict=True)
-    print(outputs.language_model_outputs.encoder_last_hidden_state.shape)
+    print('Last hidden state: ', outputs.language_model_outputs.encoder_last_hidden_state.shape)
     outputs = model.generate(
             **inputs,
             do_sample=True,
             num_beams=5,
-            max_length=256,
-            min_length=5,
+            max_length=512,
+            min_length=10,
             top_p=0.9,
-            repetition_penalty=1.5,
-            length_penalty=1.0,
+            repetition_penalty=2.5,
+            length_penalty=0.5,
             temperature=1,
     )
     generated_text = processor.batch_decode(outputs, skip_special_tokens=True)[0].strip()
