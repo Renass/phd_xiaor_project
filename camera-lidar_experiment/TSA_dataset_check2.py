@@ -15,8 +15,8 @@ Check one trajectory from dataset as a slide show
 camera_image-map(costmap)-action slide show
 '''
 
-FILENAME = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/2A724_may/tsa_combined.h5'
-EPISODE_NUMBER = 54
+FILENAME = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/cola/tsa_combined.h5'
+EPISODE_NUMBER = 0
 #pause before slides
 INTERVAL = 3000
 
