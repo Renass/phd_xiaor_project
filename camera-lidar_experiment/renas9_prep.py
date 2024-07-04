@@ -18,7 +18,10 @@ File work:
         action_annotation_tasks.txt - prompt annotations of action options
     output:
         _model9_prep.h5 (demonstartion episodes, where states-actions made as ENCODER context - sequences of tokens):
-
+            'states' : blip2encoder representations of states
+            'actions': actions in 4 coordinates(reduced quaternion)
+            'act_vocab_tokens' : blip2encoder representations of action vocabulary
+            'act_vocab_coords' : 4 coordinates (reduced quaternion) action vocabulary 
    
 MODEL 9:
     Behavioral cloning Renas  transformer camera-lidar
@@ -94,6 +97,7 @@ if __name__ == '__main__':
     annot_prompt = []
     action_vocab_token = []
     action_vocab_coordinate = []
+    a_label = []
 
     prompt_filename = DATASET[:-3]+'_tasks.txt'
     with open(prompt_filename, 'r') as file:
@@ -174,9 +178,7 @@ if __name__ == '__main__':
                 
                 a = torch.from_numpy(action_group[episode][:])
                 a = torch.cat((a, torch.ones((1,4))), dim=0)
-                
-                print(a.shape)
-                #new_hdf_action_group.create_dataset(episode, data=a, dtype = np.float32, compression = 'gzip')
+                new_hdf_action_group.create_dataset(episode, data=a, dtype = np.float32, compression = 'gzip')
 
     
     print('preprocess full time: ',time.time()-preprocess_timer_start)
