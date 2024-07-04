@@ -1,5 +1,10 @@
 import torch
 import h5py
+from torch.utils.data import Dataset, DataLoader
+import torch.nn.functional as F
+from torch.nn.utils.rnn import pad_sequence
+from transformers import OpenAIGPTConfig, OpenAIGPTModel
+import math
 
 '''
 TRAIN LOOP for Renas MODEL 9
@@ -33,13 +38,127 @@ DATA:
 '''
 
 DEVICE = 'cuda:0'
+TEST_PART = 0.2
 # DATASET is preprocessed with renas9prep.py file 
 DATASET = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/2A724_may/tsa_combined_model9_prep.h5'
+BATCH_SIZE = 1
+
+class PositionalEncoding(torch.nn.Module):
+    def __init__(self, d_model, dropout=0.1, max_len=5000):
+        super(PositionalEncoding, self).__init__()
+        self.dropout = torch.nn.Dropout(p=dropout)
+
+        position = torch.arange(max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model))
+        pe = torch.zeros(max_len, 1, d_model)
+        pe[:, 0, 0::2] = torch.sin(position * div_term)
+        pe[:, 0, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        x = x + self.pe[:x.size(0)]
+        return self.dropout(x)
+    
+class EncodingVector(torch.nn.Module):
+    def __init__(self, d_model):
+        super(EncodingVector, self).__init__()
+        self.modality_vector = torch.nn.Parameter(torch.randn(d_model))
+    def forward(self, x):
+        return x + self.modality_vector.unsqueeze(0).unsqueeze(0)
+
+class Renas9forTrain(torch.nn.Module):
+    def __init__(self, device):
+        super(Renas9forTrain, self).__init__()
+        self.device = device
+
+
+        self.pos_enc = PositionalEncoding(d_model=self.d_model)
+
+        self.im_prompt_enc_vector = EncodingVector(d_model=self.d_model)
+        self.actions_enc_vector = EncodingVector(d_model=self.d_model)
+        
+        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=10, n_head=32)
+        self.gpt_model = OpenAIGPTModel(self.gpt_config)
+
+        self.q_weights = torch.nn.Linear(self.d_model, self.d_model)
+        self.k_weights = torch.nn.Linear(self.d_model, self.d_model)
+
+
+
+    def forward(self, batch, action_vocab_token):
+        im, action, _, prompt = batch
+        i1, i2, i3, i4, i5 = im.size()
+        im = im.view(i1*i2, i3, i4, i5)
+
+        prompt = [prompt for prompt in prompt for _ in range(i2)]
+
+
+        im_prompt = self.processor(images=im, text=prompt, return_tensors="pt", padding=True).to(self.device, torch.bfloat16)
+        im_prompt = {key: val.to(self.device) for key, val in im_prompt.items()}
+        batch_size = im_prompt['input_ids'].size(0)
+        # Initialize decoder_input_ids with the BOS token
+        if 'decoder_input_ids' not in im_prompt:
+            im_prompt['decoder_input_ids'] = torch.LongTensor([self.blip_config.text_config.bos_token_id]).repeat(batch_size, 1).to(im_prompt['input_ids'].device)
+        
+        im_prompt = self.blip_model(**im_prompt, return_dict=True)
+        im_prompt = im_prompt.language_model_outputs.encoder_last_hidden_state
+        im_prompt = torch.mean(im_prompt, dim=1).unsqueeze(1).view(i1, i2, self.d_model)
+        
+        actions = action.to(self.device)
+        
+        im_prompt = self.im_prompt_enc_vector(im_prompt)
+        actions = self.actions_enc_vector(actions)
+
+        im_prompt = self.pos_enc(im_prompt)
+        actions = self.pos_enc(actions)
+        
+        # 2 types of data for gpt
+        tokens = torch.zeros(i1, i2*2, self.d_model, device=self.device)
+        tokens[:, 0::2, :] = im_prompt
+        tokens[:, 1::2, :] = actions
+
+        tokens = self.gpt_model(inputs_embeds = tokens).last_hidden_state
+        tokens = tokens[:, 0::2, :]
+        tokens = self.q_weights(tokens)
+        action_vocab_token = action_vocab_token.to(self.device)
+        action_vocab_token = self.k_weights(action_vocab_token).unsqueeze(0)
+        attention_scores = torch.matmul(tokens, action_vocab_token.transpose(1, 2))
+        return attention_scores
+
+class StateActionDataset(Dataset):
+    def __init__(self, state, action, a_label):
+        self.state = state
+        self.action = action
+        self.a_label = a_label
+    def __len__(self):
+        return len(self.state)
+    def __getitem__(self, idx):
+        state = self.state[idx]
+        action = self.action[idx]
+        a_label = self.a_label[idx]
+        return state, action, a_label
+
+def action2label_vocab(action, action_vocab_action):
+    action = action.unsqueeze(1)
+    action_vocab_action = action_vocab_action.unsqueeze(0) 
+    similarity_scores = F.cosine_similarity(action, action_vocab_action, dim=2)
+    max_values, max_indices = torch.max(similarity_scores, dim=1)
+    return max_indices
+
+def padding_collate(batch):
+    new_batch = []
+    for i in range(3): # 3 data types: states, action, a_label
+        new_batch.append([item[i] for item in batch])
+        new_batch[i] = pad_sequence(new_batch[i], batch_first=True, padding_value= 1.0)
+    return new_batch
 
 def main():
     states = []
     actions = []
-    a_label = []
+    a_labels = []
+    act_vocab_tokens = []
+    act_vocab_coords = []
+    global device
 
     if torch.cuda.is_available():
         for i in range(torch.cuda.device_count()):
@@ -56,17 +175,38 @@ def main():
         num_episodes = len(hdf['states'])
         num_annots = len(hdf['act_vocab_tokens'])
         print('Dataset contains episodes: ', num_episodes)
-        print('Action vocabulary contains options: ', num_annots)
+        print('Action vocabulary contains options (with EOS): ', num_annots)
+        for i in range(num_annots):
+            annot_i = 'data_'+str(i)
+            annot = torch.from_numpy(hdf['act_vocab_tokens'][annot_i][:]).to(dtype=torch.bfloat16)
+            act_vocab_tokens.append(annot)
+            annot = torch.from_numpy(hdf['act_vocab_coords'][annot_i][:]).float()
+            act_vocab_coords.append(annot)
+        act_vocab_coords = torch.stack(act_vocab_coords, dim=0)
         for i in range(num_episodes):
             episode_i = 'data_'+str(i)
             state = torch.from_numpy(hdf['states'][episode_i][:]).to(dtype=torch.bfloat16)
             states.append(state)
             action = torch.from_numpy(hdf['actions'][episode_i][:]).float()
+            #print(action)
             actions.append(action)
+            a_label = action2label_vocab(action, act_vocab_coords)
+            #print(a_label)
+            a_labels.append(a_label)
 
-            print('\n')
-            print(state.shape)
-            print(action.shape)
+    
+    dataset =  StateActionDataset(states, actions, a_labels)
+    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [1-TEST_PART, TEST_PART])
+    train_loop(train_dataset, test_dataset)
+    print('Starting Training...')
+
+def train_loop(train_dataset, test_dataset):
+    train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=padding_collate)
+    test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=padding_collate)
+    
+    model = Renas9forTrain(device).to(device)
+    model.train()
+
 
 if __name__ == '__main__':
     main()

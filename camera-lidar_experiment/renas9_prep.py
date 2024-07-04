@@ -122,27 +122,35 @@ if __name__ == '__main__':
             action_group = annot_hdf['actions']
             num_annots = len(im_group)
             print('ACTION ANNOTATION contains options: ', num_annots)
-            for i in range(num_annots):
-                annot = 'data_'+str(i)
-                im_i = torch.from_numpy(im_group[annot][0]).float()
-                inputs = model.processor(images=im_i, text= prompt[i], return_tensors="pt")
-                inputs = {key: val.to(device) for key, val in inputs.items()}
-                if 'decoder_input_ids' not in inputs:
-                    inputs['decoder_input_ids'] = torch.LongTensor([model.blip_config.text_config.bos_token_id]).repeat(1, 1).to(inputs['input_ids'].device)
-                outputs = model.blip_model.forward(**inputs, return_dict=True)
-                #print(outputs.language_model_outputs.encoder_last_hidden_state.dtype)
-                action_vocab_token.append(outputs.language_model_outputs.encoder_last_hidden_state)   
-                action_vocab_coordinate.append(torch.from_numpy(action_group[annot][0]))
+            for i in range(num_annots+1):
+                if i<num_annots:
+                    #For annons except EOS token
+                    annot = 'data_'+str(i)
+                    im_i = torch.from_numpy(im_group[annot][0]).float()
+                    inputs = model.processor(images=im_i, text= prompt[i], return_tensors="pt")
+                    inputs = {key: val.to(device) for key, val in inputs.items()}
+                    if 'decoder_input_ids' not in inputs:
+                        inputs['decoder_input_ids'] = torch.LongTensor([model.blip_config.text_config.bos_token_id]).repeat(1, 1).to(inputs['input_ids'].device)
+                    outputs = model.blip_model.forward(**inputs, return_dict=True)
+                    #print(outputs.language_model_outputs.encoder_last_hidden_state.dtype)
+                    action_vocab_token.append(outputs.language_model_outputs.encoder_last_hidden_state)   
+                    action_vocab_coordinate.append(torch.from_numpy(action_group[annot][0]))
+                else:
+                    #For EOS token
+                    action_vocab_token.append(torch.ones_like(action_vocab_token[0]))
+                    action_vocab_coordinate.append(torch.ones_like(action_vocab_coordinate[0]))
+                
                 new_hdf_act_vocab_tokens_group.create_dataset('data_'+str(i), data=action_vocab_token[i].cpu().to(dtype=torch.float32), dtype = np.float32, compression = 'gzip')
                 new_hdf_act_vocab_coordinates_group.create_dataset('data_'+str(i), data=action_vocab_coordinate[i], dtype = np.float32, compression = 'gzip')
-        
-        action_vocab_token = torch.stack(action_vocab_token, dim=0)
+
+
+        #action_vocab_token = torch.stack(action_vocab_token, dim=0)
         #additional end_token of ones
-        action_vocab_token = torch.cat((action_vocab_token, torch.ones_like(action_vocab_token[0].unsqueeze(0))))
-        
-        action_vocab_coordinate = torch.stack(action_vocab_coordinate, dim=0)
+        #action_vocab_token = torch.cat((action_vocab_token, torch.ones_like(action_vocab_token[0].unsqueeze(0))))
+        #print('here', action_vocab_token.shape)
+        #action_vocab_coordinate = torch.stack(action_vocab_coordinate, dim=0)
         #additional end_token of ones
-        action_vocab_coordinate = torch.cat((action_vocab_coordinate, torch.ones((1, 4))))  
+        #action_vocab_coordinate = torch.cat((action_vocab_coordinate, torch.ones((1, 4))))  
         
         with h5py.File(DATASET, 'r') as hdf:
             im_group = hdf['states']
