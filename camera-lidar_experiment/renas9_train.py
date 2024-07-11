@@ -5,6 +5,10 @@ import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
 from transformers import OpenAIGPTConfig, OpenAIGPTModel
 import math
+from torch.optim.lr_scheduler import SequentialLR, LinearLR, CosineAnnealingLR, ConstantLR
+from torch.utils.tensorboard import SummaryWriter
+import os
+import time
 
 '''
 TRAIN LOOP for Renas MODEL 9
@@ -37,11 +41,20 @@ DATA:
     (Im) or (Im-map), prompt
 '''
 
+LR = 10e-7
+LR_WARMUP_EPOCHS = 5 
+LR_DECAY_EPOCHS = 100
+
 DEVICE = 'cuda:0'
 TEST_PART = 0.2
 # DATASET is preprocessed with renas9prep.py file 
 DATASET = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/2A724_may/tsa_combined_model9_prep.h5'
 BATCH_SIZE = 1
+CHECKPOINT_INTERVAL = 25
+
+WEIGHTS_DIR = '/data/renas/pythonprogv2/phd_xiaor_project/weights'
+LOAD_WEIGHTS = 'renas9.pt'
+SAVE_WEIGHTS = 'renas9.pt'
 
 class PositionalEncoding(torch.nn.Module):
     def __init__(self, d_model, dropout=0.1, max_len=5000):
@@ -70,6 +83,7 @@ class Renas9forTrain(torch.nn.Module):
     def __init__(self, device):
         super(Renas9forTrain, self).__init__()
         self.device = device
+        self.d_model = 2048
 
 
         self.pos_enc = PositionalEncoding(d_model=self.d_model)
@@ -80,29 +94,14 @@ class Renas9forTrain(torch.nn.Module):
         self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=10, n_head=32)
         self.gpt_model = OpenAIGPTModel(self.gpt_config)
 
+        #Weights for final cross-attention multiple choice
         self.q_weights = torch.nn.Linear(self.d_model, self.d_model)
         self.k_weights = torch.nn.Linear(self.d_model, self.d_model)
 
 
 
     def forward(self, batch, action_vocab_token):
-        im, action, _, prompt = batch
-        i1, i2, i3, i4, i5 = im.size()
-        im = im.view(i1*i2, i3, i4, i5)
-
-        prompt = [prompt for prompt in prompt for _ in range(i2)]
-
-
-        im_prompt = self.processor(images=im, text=prompt, return_tensors="pt", padding=True).to(self.device, torch.bfloat16)
-        im_prompt = {key: val.to(self.device) for key, val in im_prompt.items()}
-        batch_size = im_prompt['input_ids'].size(0)
-        # Initialize decoder_input_ids with the BOS token
-        if 'decoder_input_ids' not in im_prompt:
-            im_prompt['decoder_input_ids'] = torch.LongTensor([self.blip_config.text_config.bos_token_id]).repeat(batch_size, 1).to(im_prompt['input_ids'].device)
-        
-        im_prompt = self.blip_model(**im_prompt, return_dict=True)
-        im_prompt = im_prompt.language_model_outputs.encoder_last_hidden_state
-        im_prompt = torch.mean(im_prompt, dim=1).unsqueeze(1).view(i1, i2, self.d_model)
+        state, action, _, = batch
         
         actions = action.to(self.device)
         
@@ -197,16 +196,100 @@ def main():
     
     dataset =  StateActionDataset(states, actions, a_labels)
     train_dataset, test_dataset = torch.utils.data.random_split(dataset, [1-TEST_PART, TEST_PART])
-    train_loop(train_dataset, test_dataset)
     print('Starting Training...')
+    train_loop(train_dataset, test_dataset, act_vocab_tokens)
 
-def train_loop(train_dataset, test_dataset):
+def train_loop(train_dataset, test_dataset, act_vocab_tokens):
     train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=padding_collate)
     test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=padding_collate)
     
     model = Renas9forTrain(device).to(device)
     model.train()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=LR)
+    scheduler1 = LinearLR(optimizer, start_factor=0.1, total_iters=LR_WARMUP_EPOCHS)
+    scheduler2 = CosineAnnealingLR(optimizer, T_max=LR_DECAY_EPOCHS, eta_min= LR/10)
+    scheduler3 = ConstantLR(optimizer, factor=LR/10, total_iters= 100000)
+    scheduler = SequentialLR(optimizer, schedulers=[scheduler1, scheduler2, scheduler3], milestones=[LR_WARMUP_EPOCHS, LR_WARMUP_EPOCHS+LR_DECAY_EPOCHS])
+    criterion = torch.nn.CrossEntropyLoss()
+    ten_board_writer = SummaryWriter()
 
+    if os.path.isfile(os.path.join(WEIGHTS_DIR, LOAD_WEIGHTS)):
+        model_dict = model.state_dict()
+        pretrained_dict = torch.load(os.path.join(WEIGHTS_DIR, LOAD_WEIGHTS))
+        pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict and model_dict[k].size() == v.size()}
+        model_dict.update(pretrained_dict)
+        model.load_state_dict(model_dict)
+        del model_dict, pretrained_dict
+        print('weights loaded from file.')
 
+    epoch = 0
+    min_loss = 10000
+    while True:
+        epoch += 1
+        total_loss = 0
+        test_total_loss = 0
+        epoch_train_time_start = time.time()
+        optimizer.zero_grad()
+        total_accuracy_train = [0, 0]
+        total_accuracy_test = [0, 0]
+        for i, batch in enumerate(train_dataloader):
+            output = model(batch, act_vocab_tokens)
+            
+            
+            '''
+            #check stopped here
+            print('chech stopped here')
+            if i==0:
+                print('correct labels: ', batch[2])
+                print('model output: ', F.softmax(output, dim=-1))
+            output_flat = output.view(-1, output.shape[-1])
+            labels_flat = batch[2].to(device).view(-1)
+            loss = criterion(output_flat, labels_flat)
+            total_loss += loss
+            loss.backward()
+            _, predicted_classes = torch.max(output_flat, 1)
+            #print('Debugging: predicted classes:',predicted_classes)
+            total_accuracy_train[0] += (predicted_classes == labels_flat).float().sum()
+            total_accuracy_train[1] += labels_flat.size(0) 
+        optimizer.step()
+        scheduler.step()
+        average_loss = total_loss/len(train_dataloader)
+        ten_board_writer.add_scalar('Loss', average_loss.item(), epoch)
+            
+        print('\nEpoch: ', epoch,"  Training Loss:", average_loss.item())
+        print("  Training Accuracy:", (total_accuracy_train[0]/total_accuracy_train[1]).item())
+        
+        #Test part
+        with torch.no_grad():
+            for batch in test_dataloader:
+                output = model(batch, action_vocab_token)
+                output_flat = output.view(-1, output.shape[-1])
+                labels_flat = batch[2].to(device).view(-1)
+                test_loss = criterion(output_flat, labels_flat)
+                test_total_loss += test_loss
+                _, predicted_classes = torch.max(output_flat, 1)
+                total_accuracy_test[0] += (predicted_classes == labels_flat).float().sum()
+                total_accuracy_test[1] += labels_flat.size(0) 
+            
+            test_average_loss = test_total_loss/len(test_dataloader)   
+            ten_board_writer.add_scalar('Test_Loss', test_average_loss.item(), epoch)
+        epoch_train_time_end = time.time()
+        print("  Test Accuracy:", (total_accuracy_test[0]/total_accuracy_test[1]).item())
+        print('Epoch train time: ',epoch_train_time_end-epoch_train_time_start)
+        
+        if epoch % CHECKPOINT_INTERVAL == 0:
+            if not os.path.exists(WEIGHTS_DIR):
+                os.makedirs(WEIGHTS_DIR)
+            torch.save(model.state_dict(), os.path.join(WEIGHTS_DIR, 'temp_'+ SAVE_WEIGHTS))
+            shutil.move(os.path.join(WEIGHTS_DIR, 'temp_'+ SAVE_WEIGHTS), os.path.join(WEIGHTS_DIR, SAVE_WEIGHTS))
+
+            if test_average_loss.item()<min_loss:
+                torch.save(model.state_dict(), os.path.join(WEIGHTS_DIR, 'temp_'+ 'early_'+ SAVE_WEIGHTS))
+                shutil.move(os.path.join(WEIGHTS_DIR, 'temp_'+'early_'+ SAVE_WEIGHTS), os.path.join(WEIGHTS_DIR, 'early_'+ SAVE_WEIGHTS))
+                min_loss = test_average_loss.item()
+                print('Early stopping with loss', min_loss, 'at the epoch', epoch)
+            print('weights saved')
+
+        '''
 if __name__ == '__main__':
     main()
