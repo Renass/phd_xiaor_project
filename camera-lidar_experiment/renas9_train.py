@@ -4,11 +4,13 @@ from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
 from transformers import OpenAIGPTConfig, OpenAIGPTModel
+from transformers import BertTokenizer, BertModel, BertConfig
 import math
 from torch.optim.lr_scheduler import SequentialLR, LinearLR, CosineAnnealingLR, ConstantLR
 from torch.utils.tensorboard import SummaryWriter
 import os
 import time
+import inspect
 
 '''
 TRAIN LOOP for Renas MODEL 9
@@ -85,9 +87,16 @@ class Renas9forTrain(torch.nn.Module):
         self.device = device
         self.d_model = 2048
 
+        self.mid_t_config = BertConfig( 
+            hidden_size=self.d_model, 
+            intermediate_size=self.d_model*4,
+            num_hidden_layers= 5,
+            num_attention_heads= 32
+            )
+        self.mid_t_model = BertModel(config=self.mid_t_config)
+
 
         self.pos_enc = PositionalEncoding(d_model=self.d_model)
-
         self.im_prompt_enc_vector = EncodingVector(d_model=self.d_model)
         self.actions_enc_vector = EncodingVector(d_model=self.d_model)
         
@@ -100,29 +109,50 @@ class Renas9forTrain(torch.nn.Module):
 
 
 
-    def forward(self, batch, action_vocab_token):
+    def forward(self, batch, act_vocab_coords, act_vocab_token):
         state, action, _, = batch
+        state = state.to(self.device)
+        action = action.to(self.device)
+        act_vocab_coords = act_vocab_coords.to(self.device)
         
-        actions = action.to(self.device)
-        
-        im_prompt = self.im_prompt_enc_vector(im_prompt)
-        actions = self.actions_enc_vector(actions)
+        #mid-transformer
+        #act reduct
+        action = action2token_vocab(action, act_vocab_coords, act_vocab_token)
+        aa= []
+        for i in action:
+            a = []
+            for j in i:
+                j = j.to(self.device)
+                attention_mask = torch.ones(j.size()[:-1], dtype=torch.long).to(self.device)
+                a.append(self.mid_t_model.forward(inputs_embeds = j, attention_mask= attention_mask).pooler_output)
+            aa.append(torch.cat(a, dim=0))
+        aa= torch.stack(aa, dim=0)
+        #state reduct
+        for i in state:
+            for j in i:
+                j = j.unsqueeze(0)
+                
 
-        im_prompt = self.pos_enc(im_prompt)
-        actions = self.pos_enc(actions)
+            
+
+        #state-action-gpt part
+        #tate = self.im_prompt_enc_vector(state)
+        #action = self.actions_enc_vector(action)
+        #im_prompt = self.pos_enc(im_prompt)
+        #actions = self.pos_enc(actions)
         
         # 2 types of data for gpt
-        tokens = torch.zeros(i1, i2*2, self.d_model, device=self.device)
-        tokens[:, 0::2, :] = im_prompt
-        tokens[:, 1::2, :] = actions
+        #tokens = torch.zeros(i1, i2*2, self.d_model, device=self.device)
+        #tokens[:, 0::2, :] = im_prompt
+        #tokens[:, 1::2, :] = actions
 
-        tokens = self.gpt_model(inputs_embeds = tokens).last_hidden_state
-        tokens = tokens[:, 0::2, :]
-        tokens = self.q_weights(tokens)
-        action_vocab_token = action_vocab_token.to(self.device)
-        action_vocab_token = self.k_weights(action_vocab_token).unsqueeze(0)
-        attention_scores = torch.matmul(tokens, action_vocab_token.transpose(1, 2))
-        return attention_scores
+        #tokens = self.gpt_model(inputs_embeds = tokens).last_hidden_state
+        #tokens = tokens[:, 0::2, :]
+        #tokens = self.q_weights(tokens)
+        #action_vocab_token = action_vocab_token.to(self.device)
+        #action_vocab_token = self.k_weights(action_vocab_token).unsqueeze(0)
+        #attention_scores = torch.matmul(tokens, action_vocab_token.transpose(1, 2))
+        return 0
 
 class StateActionDataset(Dataset):
     def __init__(self, state, action, a_label):
@@ -144,12 +174,49 @@ def action2label_vocab(action, action_vocab_action):
     max_values, max_indices = torch.max(similarity_scores, dim=1)
     return max_indices
 
+def action2token_vocab(action, act_vocab_coords, act_vocab_tokens):
+    '''
+    Convert action on coordinates (quaternions) shaped:
+    [seq_length, 4] or [batch_size, seq_length, 4]
+    to action in encoder representation (batch_size, seq_length, d_model) 
+    '''
+    #correct shape: [1, vocab_size, 4]
+    act_vocab_coords = act_vocab_coords.unsqueeze(0)
+
+    if action.dim() == 2:
+        action = action.unsqueeze(0)
+    batch_size = action.shape[0] 
+    
+    # Compute cosine similarity (batch_size, seq_length, vocab_size)
+    similarity_scores = F.cosine_similarity(action.unsqueeze(2), act_vocab_coords.unsqueeze(0), dim=-1)
+    
+    # Find the max similarity scores and their indices
+    max_values, max_indices = torch.max(similarity_scores, dim=-1)
+    #print('here', max_indices)
+    if torch.min(max_values).item() < 0.999:
+        print('Warning: action coordinates not match vocabulary!!!')
+    
+
+    a = []
+    aa= []
+    for i in range(batch_size):
+        for j in max_indices[i]:
+            a.append(act_vocab_tokens[j])
+        aa.append(a)
+    return aa
+
 def padding_collate(batch):
     new_batch = []
     for i in range(3): # 3 data types: states, action, a_label
         new_batch.append([item[i] for item in batch])
         new_batch[i] = pad_sequence(new_batch[i], batch_first=True, padding_value= 1.0)
     return new_batch
+
+def print_shape(x):
+    frame = inspect.currentframe().f_back
+    variable_names = {id(value): name for name, value in frame.f_locals.items()}
+    var_name = variable_names.get(id(x), 'variable')
+    print(var_name, 'shape:', x.shape)
 
 def main():
     states = []
@@ -196,10 +263,10 @@ def main():
     
     dataset =  StateActionDataset(states, actions, a_labels)
     train_dataset, test_dataset = torch.utils.data.random_split(dataset, [1-TEST_PART, TEST_PART])
-    print('Starting Training...')
-    train_loop(train_dataset, test_dataset, act_vocab_tokens)
+    print('Starting Training loop...')
+    train_loop(train_dataset, test_dataset, act_vocab_coords, act_vocab_tokens)
 
-def train_loop(train_dataset, test_dataset, act_vocab_tokens):
+def train_loop(train_dataset, test_dataset, act_vocab_coords, act_vocab_tokens):
     train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=padding_collate)
     test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=padding_collate)
     
@@ -233,7 +300,7 @@ def train_loop(train_dataset, test_dataset, act_vocab_tokens):
         total_accuracy_train = [0, 0]
         total_accuracy_test = [0, 0]
         for i, batch in enumerate(train_dataloader):
-            output = model(batch, act_vocab_tokens)
+            output = model(batch, act_vocab_coords, act_vocab_tokens)
             
             
             '''

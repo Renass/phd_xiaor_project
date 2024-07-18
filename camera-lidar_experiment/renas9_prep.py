@@ -127,19 +127,19 @@ if __name__ == '__main__':
                     #For annons except EOS token
                     annot = 'data_'+str(i)
                     im_i = torch.from_numpy(im_group[annot][0]).float()
-                    inputs = model.processor(images=im_i, text= prompt[i], return_tensors="pt")
+                    inputs = model.processor(images=im_i, text= annot_prompt[i], return_tensors="pt")
                     inputs = {key: val.to(device) for key, val in inputs.items()}
                     if 'decoder_input_ids' not in inputs:
                         inputs['decoder_input_ids'] = torch.LongTensor([model.blip_config.text_config.bos_token_id]).repeat(1, 1).to(inputs['input_ids'].device)
                     outputs = model.blip_model.forward(**inputs, return_dict=True)
                     #print(outputs.language_model_outputs.encoder_last_hidden_state.dtype)
+                    print('Action annotation token shape:', outputs.language_model_outputs.encoder_last_hidden_state.shape)
                     action_vocab_token.append(outputs.language_model_outputs.encoder_last_hidden_state)   
                     action_vocab_coordinate.append(torch.from_numpy(action_group[annot][0]))
                 else:
                     #For EOS token
                     action_vocab_token.append(torch.ones_like(action_vocab_token[0]))
                     action_vocab_coordinate.append(torch.ones_like(action_vocab_coordinate[0]))
-                
                 new_hdf_act_vocab_tokens_group.create_dataset('data_'+str(i), data=action_vocab_token[i].cpu().to(dtype=torch.float32), dtype = np.float32, compression = 'gzip')
                 new_hdf_act_vocab_coordinates_group.create_dataset('data_'+str(i), data=action_vocab_coordinate[i], dtype = np.float32, compression = 'gzip')
 
@@ -167,7 +167,7 @@ if __name__ == '__main__':
                 if 'decoder_input_ids' not in inputs:
                     inputs['decoder_input_ids'] = torch.LongTensor([model.blip_config.text_config.bos_token_id]).repeat(episode_len, 1).to(inputs['input_ids'].device)
                 outputs = model.blip_model.forward(**inputs, return_dict=True)
-                #print('Last hidden state: ', outputs.language_model_outputs.encoder_last_hidden_state.shape)
+                print('states shape:', outputs.language_model_outputs.encoder_last_hidden_state.shape)
                 new_hdf_im_group.create_dataset(episode, data=outputs.language_model_outputs.encoder_last_hidden_state.cpu().to(dtype=torch.float32), dtype = np.float32, compression = 'gzip')
                     #outputs = model.blip_model.generate(
                     #        **inputs,
