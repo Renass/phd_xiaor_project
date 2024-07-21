@@ -11,6 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 import os
 import time
 import inspect
+import shutil
 
 '''
 TRAIN LOOP for Renas MODEL 9
@@ -43,7 +44,7 @@ DATA:
     (Im) or (Im-map), prompt
 '''
 
-LR = 10e-7
+LR = 10e-10
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 
@@ -115,8 +116,16 @@ class Renas9forTrain(torch.nn.Module):
         action = action.to(self.device)
         act_vocab_coords = act_vocab_coords.to(self.device)
         
+        #mid-transformer 
+        # action annotation
+        an = []
+        for i in act_vocab_token:
+            i = i.to(self.device)
+            attention_mask = torch.ones(i.size()[:-1], dtype=torch.long).to(self.device)
+            an.append(self.mid_t_model.forward(inputs_embeds = i, attention_mask= attention_mask).pooler_output)            
+        an = torch.cat(an, dim=0)
         #mid-transformer
-        #act reduct
+        #action
         action = action2token_vocab(action, act_vocab_coords, act_vocab_token)
         aa= []
         for i in action:
@@ -127,32 +136,37 @@ class Renas9forTrain(torch.nn.Module):
                 a.append(self.mid_t_model.forward(inputs_embeds = j, attention_mask= attention_mask).pooler_output)
             aa.append(torch.cat(a, dim=0))
         aa= torch.stack(aa, dim=0)
-        #state reduct
+        #mid-transformer
+        #state
+        ss = [] 
         for i in state:
+            s = []
             for j in i:
                 j = j.unsqueeze(0)
-                
+                attention_mask = torch.ones(j.size()[:-1], dtype=torch.long).to(self.device)
+                s.append(self.mid_t_model.forward(inputs_embeds = j, attention_mask= attention_mask).pooler_output)
+            ss.append(torch.cat(s, dim=0))
+        ss = torch.stack(ss, dim=0)
 
-            
 
         #state-action-gpt part
-        #tate = self.im_prompt_enc_vector(state)
-        #action = self.actions_enc_vector(action)
-        #im_prompt = self.pos_enc(im_prompt)
-        #actions = self.pos_enc(actions)
+        state = self.im_prompt_enc_vector(ss)
+        action = self.actions_enc_vector(aa)
+        state = self.pos_enc(state)
+        action = self.pos_enc(action)
         
+        batch_size, seq_len, _ = state.shape
         # 2 types of data for gpt
-        #tokens = torch.zeros(i1, i2*2, self.d_model, device=self.device)
-        #tokens[:, 0::2, :] = im_prompt
-        #tokens[:, 1::2, :] = actions
+        tokens = torch.zeros(batch_size, seq_len*2, self.d_model, device=self.device)
+        tokens[:, 0::2, :] = state
+        tokens[:, 1::2, :] = action
 
-        #tokens = self.gpt_model(inputs_embeds = tokens).last_hidden_state
-        #tokens = tokens[:, 0::2, :]
-        #tokens = self.q_weights(tokens)
-        #action_vocab_token = action_vocab_token.to(self.device)
-        #action_vocab_token = self.k_weights(action_vocab_token).unsqueeze(0)
-        #attention_scores = torch.matmul(tokens, action_vocab_token.transpose(1, 2))
-        return 0
+        tokens = self.gpt_model(inputs_embeds = tokens).last_hidden_state
+        tokens = tokens[:, 0::2, :]
+        tokens = self.q_weights(tokens)
+        an = self.k_weights(an).unsqueeze(0)
+        attention_scores = torch.matmul(tokens, an.transpose(1, 2))
+        return attention_scores
 
 class StateActionDataset(Dataset):
     def __init__(self, state, action, a_label):
@@ -301,14 +315,14 @@ def train_loop(train_dataset, test_dataset, act_vocab_coords, act_vocab_tokens):
         total_accuracy_test = [0, 0]
         for i, batch in enumerate(train_dataloader):
             output = model(batch, act_vocab_coords, act_vocab_tokens)
-            
-            
-            '''
-            #check stopped here
-            print('chech stopped here')
+            # prinn 1st batch 1st episode labels and predictions
             if i==0:
-                print('correct labels: ', batch[2])
-                print('model output: ', F.softmax(output, dim=-1))
+                print('correct labels: ', batch[2][0])
+                print('model output: ')
+                softmax_output = F.softmax(output[0], dim=-1)
+                formatted_output = [[f"{value.item():.2f}" for value in row] for row in softmax_output]
+                for row in formatted_output:
+                    print(row)
             output_flat = output.view(-1, output.shape[-1])
             labels_flat = batch[2].to(device).view(-1)
             loss = criterion(output_flat, labels_flat)
@@ -329,7 +343,7 @@ def train_loop(train_dataset, test_dataset, act_vocab_coords, act_vocab_tokens):
         #Test part
         with torch.no_grad():
             for batch in test_dataloader:
-                output = model(batch, action_vocab_token)
+                output = model(batch, act_vocab_coords, act_vocab_tokens)
                 output_flat = output.view(-1, output.shape[-1])
                 labels_flat = batch[2].to(device).view(-1)
                 test_loss = criterion(output_flat, labels_flat)
@@ -357,6 +371,6 @@ def train_loop(train_dataset, test_dataset, act_vocab_coords, act_vocab_tokens):
                 print('Early stopping with loss', min_loss, 'at the epoch', epoch)
             print('weights saved')
 
-        '''
+        
 if __name__ == '__main__':
     main()
