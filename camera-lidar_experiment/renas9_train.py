@@ -44,7 +44,7 @@ DATA:
     (Im) or (Im-map), prompt
 '''
 
-LR = 10e-10
+LR = 10e-7
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 
@@ -56,7 +56,7 @@ BATCH_SIZE = 1
 CHECKPOINT_INTERVAL = 25
 
 WEIGHTS_DIR = '/data/renas/pythonprogv2/phd_xiaor_project/weights'
-LOAD_WEIGHTS = 'renas9.pt'
+LOAD_WEIGHTS = 'early_renas9.pt'
 SAVE_WEIGHTS = 'renas9.pt'
 
 class PositionalEncoding(torch.nn.Module):
@@ -91,7 +91,7 @@ class Renas9forTrain(torch.nn.Module):
         self.mid_t_config = BertConfig( 
             hidden_size=self.d_model, 
             intermediate_size=self.d_model*4,
-            num_hidden_layers= 5,
+            num_hidden_layers= 20,
             num_attention_heads= 32
             )
         self.mid_t_model = BertModel(config=self.mid_t_config)
@@ -101,7 +101,7 @@ class Renas9forTrain(torch.nn.Module):
         self.im_prompt_enc_vector = EncodingVector(d_model=self.d_model)
         self.actions_enc_vector = EncodingVector(d_model=self.d_model)
         
-        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=10, n_head=32)
+        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=20, n_head=32)
         self.gpt_model = OpenAIGPTModel(self.gpt_config)
 
         #Weights for final cross-attention multiple choice
@@ -135,7 +135,7 @@ class Renas9forTrain(torch.nn.Module):
                 attention_mask = torch.ones(j.size()[:-1], dtype=torch.long).to(self.device)
                 a.append(self.mid_t_model.forward(inputs_embeds = j, attention_mask= attention_mask).pooler_output)
             aa.append(torch.cat(a, dim=0))
-        aa= torch.stack(aa, dim=0)
+        action= torch.stack(aa, dim=0)
         #mid-transformer
         #state
         ss = [] 
@@ -146,14 +146,14 @@ class Renas9forTrain(torch.nn.Module):
                 attention_mask = torch.ones(j.size()[:-1], dtype=torch.long).to(self.device)
                 s.append(self.mid_t_model.forward(inputs_embeds = j, attention_mask= attention_mask).pooler_output)
             ss.append(torch.cat(s, dim=0))
-        ss = torch.stack(ss, dim=0)
+        state = torch.stack(ss, dim=0)
 
 
         #state-action-gpt part
-        state = self.im_prompt_enc_vector(ss)
-        action = self.actions_enc_vector(aa)
-        state = self.pos_enc(state)
-        action = self.pos_enc(action)
+        state = self.im_prompt_enc_vector(state)
+        action = self.actions_enc_vector(action)
+        #state = self.pos_enc(state)
+        #action = self.pos_enc(action)
         
         batch_size, seq_len, _ = state.shape
         # 2 types of data for gpt
