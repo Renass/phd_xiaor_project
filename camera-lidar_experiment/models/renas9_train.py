@@ -44,7 +44,7 @@ DATA:
     (Im) or (Im-map), prompt
 '''
 
-LR = 10e-7
+LR = 10e-5
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 
@@ -56,7 +56,7 @@ BATCH_SIZE = 1
 CHECKPOINT_INTERVAL = 25
 
 WEIGHTS_DIR = '/data/renas/pythonprogv2/phd_xiaor_project/weights'
-LOAD_WEIGHTS = 'early_renas9.pt'
+LOAD_WEIGHTS = 'renas9.pt'
 SAVE_WEIGHTS = 'renas9.pt'
 
 class PositionalEncoding(torch.nn.Module):
@@ -91,22 +91,22 @@ class Renas9forTrain(torch.nn.Module):
         self.mid_t_config = BertConfig( 
             hidden_size=self.d_model, 
             intermediate_size=self.d_model*4,
-            num_hidden_layers= 20,
+            num_hidden_layers= 6,
             num_attention_heads= 32
             )
-        self.mid_t_model = BertModel(config=self.mid_t_config)
+        self.mid_t_model = BertModel(config=self.mid_t_config).to(torch.bfloat16)
 
 
         self.pos_enc = PositionalEncoding(d_model=self.d_model)
-        self.im_prompt_enc_vector = EncodingVector(d_model=self.d_model)
-        self.actions_enc_vector = EncodingVector(d_model=self.d_model)
+        self.im_prompt_enc_vector = EncodingVector(d_model=self.d_model).to(torch.bfloat16)
+        self.actions_enc_vector = EncodingVector(d_model=self.d_model).to(torch.bfloat16)
         
-        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=20, n_head=32)
-        self.gpt_model = OpenAIGPTModel(self.gpt_config)
+        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=6, n_head=32)
+        self.gpt_model = OpenAIGPTModel(self.gpt_config).to(torch.bfloat16)
 
         #Weights for final cross-attention multiple choice
-        self.q_weights = torch.nn.Linear(self.d_model, self.d_model)
-        self.k_weights = torch.nn.Linear(self.d_model, self.d_model)
+        self.q_weights = torch.nn.Linear(self.d_model, self.d_model, dtype=torch.bfloat16)
+        self.k_weights = torch.nn.Linear(self.d_model, self.d_model, dtype=torch.bfloat16)
 
 
 
@@ -157,7 +157,7 @@ class Renas9forTrain(torch.nn.Module):
         
         batch_size, seq_len, _ = state.shape
         # 2 types of data for gpt
-        tokens = torch.zeros(batch_size, seq_len*2, self.d_model, device=self.device)
+        tokens = torch.zeros(batch_size, seq_len*2, self.d_model, device=self.device, dtype=torch.bfloat16)
         tokens[:, 0::2, :] = state
         tokens[:, 1::2, :] = action
 
@@ -252,6 +252,8 @@ def main():
 
     #load data
     with h5py.File(DATASET, 'r') as hdf:
+        #print("Groups in HDF5 file:")
+        #print(list(hdf.keys())) 
         num_episodes = len(hdf['states'])
         num_annots = len(hdf['act_vocab_tokens'])
         print('Dataset contains episodes: ', num_episodes)
