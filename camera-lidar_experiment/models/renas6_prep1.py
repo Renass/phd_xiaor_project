@@ -7,6 +7,8 @@ import json
 from tf.transformations import euler_from_quaternion
 import numpy as np
 import cv2
+from scipy.spatial.transform import Rotation as R
+import matplotlib.pyplot as plt
 
 '''
 rework(im_map)as_im
@@ -35,7 +37,7 @@ def world_to_map(pose, resolution, origin):
     map_y = int((pose[1] - origin[1]) / resolution)
     return (map_x, map_y)
 
-def draw_an_arrow_on_the_map(map, mapinfo, pose):
+def draw_an_arrow_on_the_map_old(map, mapinfo, pose):
     '''
     unsqueeze a lidar map to 3 dimensions
     with 1st with map and second with pose arrow
@@ -65,6 +67,40 @@ def draw_an_arrow_on_the_map(map, mapinfo, pose):
         # Visualization using matplotlib
         #plt.imshow(np.flipud(map[i].transpose(1,2,0)))
         #plt.show()
+        return map
+    
+def draw_an_arrow_on_the_map(map, mapinfo, pose):
+    '''
+    unsqueeze a lidar map to 3 dimensions
+    with 1st with map and second with pose arrow
+    accept: numpy(batch_size, h, w)
+    return: numpy(batch_size, 3, h, w)
+    '''
+    batch_size,h,w = map.shape
+    empty_channel = np.zeros((batch_size, h, w))
+    #map = np.expand_dims(map, axis=1)
+    map = np.stack((map, empty_channel, empty_channel), axis=1)
+    
+    
+    for i in range(batch_size):
+        map_pose = world_to_map(
+            (pose[i][0], pose[i][1]), 
+            mapinfo['resolution'], 
+            (mapinfo['origin']['position']['x'], 
+            mapinfo['origin']['position']['y'])
+        )
+        quaternion = [0, 0, pose[i][2], pose[i][3]]
+        #_, _, yaw = euler_from_quaternion(quaternion)
+        rotation = R.from_quat(quaternion)
+        yaw = rotation.as_euler('xyz', degrees=False)[2] 
+        arrow_length = 50
+        end_x = int(map_pose[0] + arrow_length * np.cos(yaw))
+        end_y = int(map_pose[1] + arrow_length * np.sin(yaw))
+        cv2.arrowedLine(map[i, 1, :, :], (map_pose[0], map_pose[1]), (end_x, end_y), 1.0, thickness=5)    
+        
+        # Visualization using matplotlib
+        plt.imshow(np.flipud(map[i].transpose(1,2,0)))
+        plt.show()
         return map
 
 if __name__ == '__main__':
@@ -100,10 +136,15 @@ if __name__ == '__main__':
                 map_i = map_group[episode][:]/100
                 map_i = draw_an_arrow_on_the_map(map_i, mapinfo, pose_i)
                 map_i = torch.from_numpy(map_i).float()
+                print('map shape before processor: ', map_i.shape)
                 map_i = im_processor(images=map_i, return_tensors="pt")['pixel_values']
+                print('map shape after processor: ', map_i.shape)
                 im_i = torch.from_numpy(im_group[episode][:]).float()/255.0
+                print('image shape before processor: ', im_i.shape)
                 im_i = im_processor(images=im_i, return_tensors="pt")['pixel_values']
+                print('image shape after processor: ', im_i.shape)
                 im_i = torch.cat((im_i, map_i), dim=3).numpy()
+                print('concat shape: ', im_i.shape)
                 new_hdf_im_group.create_dataset(episode, data=im_i, dtype = np.float32, compression = 'gzip')
                 a = action_group[episode][:]
                 new_hdf_action_group.create_dataset(episode, data=a, dtype = np.float32, compression = 'gzip')
