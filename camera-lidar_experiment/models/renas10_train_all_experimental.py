@@ -52,12 +52,12 @@ DATA:
     (Im) or (Im-map), prompt
 '''
 #Main real dataset
-#DATASET = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/2A724_may/tsa_combined.h5'
-#ACTION_ANNOTATION = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/poses/poses_2024-05-04_18-10-20.h5'
+DATASET = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/2A724_may/tsa_combined.h5'
+ACTION_ANNOTATION = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/poses/poses_2024-05-04_18-10-20.h5'
 
 #Sim dataset target 100%
-DATASET = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/tsa_combined.h5'
-ACTION_ANNOTATION = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/poses/poses_2024-04-25_15-00-52.h5'
+#DATASET = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/tsa_combined.h5'
+#ACTION_ANNOTATION = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/poses/poses_2024-04-25_15-00-52.h5'
 
 DEVICE = 'cuda:0'
 

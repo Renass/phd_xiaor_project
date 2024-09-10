@@ -8,23 +8,24 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
 from transformers import OpenAIGPTConfig, OpenAIGPTModel
-from transformers import BertTokenizer, BertModel, BertConfig
 import math
 from torch.optim.lr_scheduler import SequentialLR, LinearLR, CosineAnnealingLR, ConstantLR
 from torch.utils.tensorboard import SummaryWriter
 import os
 import time
-import inspect
 import shutil
 import json
 import cv2
 from scipy.spatial.transform import Rotation as R
-from transformers import VisualBertConfig, VisualBertForQuestionAnswering, ViltProcessor
+#from transformers import ViltProcessor, ViltModel
+#from transformers import Blip2Processor, Blip2ForConditionalGeneration
+from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration
 
 '''
 TRAIN LOOP for Renas MODEL 10 with multimodal encoder Included in training
 *ALL steps in one file - no prior preprocessing steps
 *IM PRETRAIN WITH ARROW LIKE IN RENAS6 MODEL
+
 File work:
     input:
         tsa_combined.h5 (demonstrations dataset)
@@ -34,8 +35,8 @@ File work:
    
 MODEL 10:
     Behavioral cloning Renas  transformer camera-lidar
-    1. TEXT-Image camera or (camera+map concatenation) ENCODER using VisualBERT 
-    2. NO TEXT GENERATION 
+    1. TEXT-Image camera or (camera+map concatenation) ENCODER using FLAVA 
+    2. FLAVA decoder for text generation 
     
     3. (im_prompt)-(action) history-aware causal driving Transformer GPT
     Loss: cross-attention metrics going to CrossEntropyLoss 
@@ -62,7 +63,7 @@ ACTION_ANNOTATION = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real
 
 DEVICE = 'cuda:0'
 
-LR = 10e-5
+LR = 10e-6
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
 UPDATE_ANNOT_RATE = 10000
@@ -72,7 +73,7 @@ BATCH_SIZE = 1
 CHECKPOINT_INTERVAL = 25
 
 WEIGHTS_DIR = '/data/renas/pythonprogv2/phd_xiaor_project/weights'
-LOAD_WEIGHTS = 'renas10.pt'
+LOAD_WEIGHTS = 'none'
 SAVE_WEIGHTS = 'renas10.pt'
 
 ###
@@ -125,106 +126,87 @@ class Renas10forTrain(torch.nn.Module):
         self.device = device
         #set d_model manually in exceptional cases
         #self.d_model = 2048
+        self.processor = LlavaNextProcessor.from_pretrained("llava-hf/llava-v1.6-mistral-7b-hf")
+        self.processor.image_processor.do_rescale = True
+        self.processor.image_processor.do_resize = True
+        self.processor.image_processor.do_normalize = False
 
-        self.visual_bert_config = VisualBertConfig.from_pretrained("uclanlp/visualbert-vqa-coco-pre")
-        self.d_model = self.bert_config.hidden_size
-        self.visual_bert_model = VisualBertForQuestionAnswering.from_pretrained("uclanlp/visualbert-vqa-coco-pre")
-        for param in self.visual_bert_model.parameters():
-            param.requires_grad = True
+        self.encoder_model = LlavaNextForConditionalGeneration.from_pretrained("llava-hf/llava-v1.6-mistral-7b-hf", torch_dtype=torch.float16)
 
+        self.d_model = self.encoder_model.config.vision_config.hidden_size
+        self.d4_model = self.d_model *4
+        for param in self.encoder_model.parameters():
+            param.requires_grad = False  
 
-
-        self.pos_enc = PositionalEncoding(d_model=self.d_model)
-        self.im_prompt_enc_vector = EncodingVector(d_model=self.d_model)
-        self.actions_enc_vector = EncodingVector(d_model=self.d_model)
+        self.pos_enc = PositionalEncoding(d_model=self.d4_model)
+        self.im_prompt_enc_vector = EncodingVector(d_model=self.d4_model)
+        self.actions_enc_vector = EncodingVector(d_model=self.d4_model)
         
-        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=6, n_head=32)
+        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d4_model, n_layer=3, n_head=32)
         self.gpt_model = OpenAIGPTModel(self.gpt_config)
 
         #Weights for final cross-attention multiple choice
-        self.q_weights = torch.nn.Linear(self.d_model, self.d_model)
-        self.k_weights = torch.nn.Linear(self.d_model, self.d_model)
+        self.q_weights = torch.nn.Linear(self.d4_model, self.d4_model)
+        self.k_weights = torch.nn.Linear(self.d4_model, self.d4_model)
 
-     def annot_forward(self, act_vocab_im, act_vocab_prompt, act_vocab_map):
+    def annot_forward(self, act_vocab_im, act_vocab_prompt, act_vocab_map):
+        #for im_i in act_vocab_im:
+            #print(im_i.shape)
+        #for im_i in act_vocab_map:
+            #print(im_i.shape)
         with torch.no_grad():
-            #VisualBERT encoder
+            #ViLT encoder
             #Work with action annotation
             act_vocab_token = []
             for i, im_i in enumerate(act_vocab_im):
-                self.blip_processor.image_processor.do_rescale = True
-                inputs = self.blip_processor(images=im_i, text= act_vocab_prompt[i], return_tensors="pt")
-                self.blip_processor.image_processor.do_rescale = False
-                inputs2 = self.blip_processor(images=[act_vocab_map[i][j] for j in range(1)], text=[act_vocab_prompt[i]], return_tensors="pt")
-
-                im_i = torch.cat((inputs['pixel_values'], inputs2['pixel_values']), dim=3)
-                inputs = self.blip_processor(images=[im_i[j] for j in range(1)], text=[act_vocab_prompt[i]], return_tensors="pt")
-                #print('here', type(inputs), inputs)
+                #print(im_i.shape)
+                #print(torch.max(im_i))
+                #print(act_vocab_map[i].shape)
+                self.processor.image_processor.do_rescale = True
+                inputs = self.processor(images=im_i, text= act_vocab_prompt[i], return_tensors="pt")
+                self.processor.image_processor.do_rescale = False
+                inputs2 = self.processor(images=[act_vocab_map[i][j] for j in range(1)], text=[act_vocab_prompt[i]], return_tensors="pt")
+                im_i = torch.cat((inputs['pixel_values'], inputs2['pixel_values']), dim=1)
+                #inputs = self.processor(images=[im_i[j] for j in range(1)], text=[act_vocab_prompt[i]], return_tensors="pt")
+                inputs['pixel_values'] = im_i
                 inputs = {key: val.to(device) for key, val in inputs.items()}
-                if 'decoder_input_ids' not in inputs:
-                    inputs['decoder_input_ids'] = torch.LongTensor([self.blip_config.text_config.bos_token_id]).repeat(1, 1).to(inputs['input_ids'].device)
-                outputs = self.blip_model.forward(**inputs, return_dict=True)
-                #print(outputs.language_model_outputs.encoder_last_hidden_state.dtype)
-                #print('Action annotation token shape:', outputs.language_model_outputs.encoder_last_hidden_state.shape)
-                act_vocab_token.append(outputs.language_model_outputs.encoder_last_hidden_state)     
+                outputs = self.encoder_model.forward(**inputs, return_dict=True, output_hidden_states = True)
+                #print('Action annotation token shape:', outputs.pooler_output.shape)
+                outputs = torch.mean(outputs.hidden_states[-1], dim=1, keepdim=False)
+                act_vocab_token.append(outputs)     
             #For EOS token
             act_vocab_token.append(torch.ones_like(act_vocab_token[0]))
+            act_vocab_token = torch.cat(act_vocab_token, dim=0)
             return act_vocab_token
 
-     def forward(self, batch, act_vocab_token):
-        #BLIP encoder
+    def forward(self, batch, act_vocab_token):
+        #ViLT encoder
         #work with dataset
         im, prompt, action, _, map = batch
         state = []
         for i, im_i in enumerate(im):
             episode_len = im_i.shape[0]
-            self.blip_processor.image_processor.do_rescale = True
-            inputs = self.blip_processor(images=[im_i[j] for j in range(episode_len)], text=[prompt[i]]*episode_len, return_tensors="pt")
-            self.blip_processor.image_processor.do_rescale = False
-            inputs2 = self.blip_processor(images=[map[i][j] for j in range(episode_len)], text=[prompt[i]]*episode_len, return_tensors="pt")
+            self.processor.image_processor.do_rescale = True
+            inputs = self.processor(images=[im_i[j] for j in range(episode_len)], text=[prompt[i]]*episode_len, return_tensors="pt")
+            self.processor.image_processor.do_rescale = False
+            inputs2 = self.processor(images=[map[i][j] for j in range(episode_len)], text=[prompt[i]]*episode_len, return_tensors="pt")
             
-            im_i = torch.cat((inputs['pixel_values'], inputs2['pixel_values']), dim=3)
-            inputs = self.blip_processor(images=[im_i[j] for j in range(episode_len)], text=[prompt[i]]*episode_len, return_tensors="pt")
+            im_i = torch.cat((inputs['pixel_values'], inputs2['pixel_values']), dim=1)
+            inputs['pixel_values'] = im_i
+            #inputs = self.processor(images=[im_i[j] for j in range(episode_len)], text=[prompt[i]]*episode_len, return_tensors="pt")
             #inputs['pixel_values'] = torch.cat((inputs['pixel_values'], inputs2['pixel_values']), dim=3)
             inputs = {key: val.to(device) for key, val in inputs.items()}
 
-            if 'decoder_input_ids' not in inputs:
-                inputs['decoder_input_ids'] = torch.LongTensor([self.blip_config.text_config.bos_token_id]).repeat(episode_len, 1).to(inputs['input_ids'].device)
-            outputs = self.blip_model.forward(**inputs, return_dict=True)
-            #print('states shape:', outputs.language_model_outputs.encoder_last_hidden_state.shape)
-            outputs.language_model_outputs.encoder_last_hidden_state
-            state.append(outputs.language_model_outputs.encoder_last_hidden_state)
-             
-        #mid-transformer 
-        # action annotation
-        an = []
-        for i in act_vocab_token:
-            i = i.to(self.device)
-            attention_mask = torch.ones(i.size()[:-1], dtype=torch.long).to(self.device)
-            an.append(self.mid_t_model.forward(inputs_embeds = i, attention_mask= attention_mask).pooler_output)            
-        an = torch.cat(an, dim=0)
-        #mid-transformer
-        #action
+            outputs = self.encoder_model.forward(**inputs, return_dict=True, output_hidden_states = True)
+            outputs = torch.mean(outputs.hidden_states[-1], dim=1, keepdim=False)
+            #print('states shape:', outputs.pooler_output.shape)
+            state.append(outputs)
+        state = torch.stack(state, dim=0)
+
+        
         action = action2token_vocab(action, act_vocab_coords, act_vocab_token)
-        aa= []
-        for i in action:
-            a = []
-            for j in i:
-                j = j.to(self.device)
-                attention_mask = torch.ones(j.size()[:-1], dtype=torch.long).to(self.device)
-                a.append(self.mid_t_model.forward(inputs_embeds = j, attention_mask= attention_mask).pooler_output)
-            aa.append(torch.cat(a, dim=0))
-        action= torch.stack(aa, dim=0)
-        #mid-transformer
-        #state
-        ss = [] 
-        for i in state:
-            s = []
-            for j in i:
-                j = j.unsqueeze(0)
-                attention_mask = torch.ones(j.size()[:-1], dtype=torch.long).to(self.device)
-                s.append(self.mid_t_model.forward(inputs_embeds = j, attention_mask= attention_mask).pooler_output)
-            ss.append(torch.cat(s, dim=0))
-        state = torch.stack(ss, dim=0)
+              
+
 
 
         #state-action-gpt part
@@ -235,20 +217,53 @@ class Renas10forTrain(torch.nn.Module):
         
         batch_size, seq_len, _ = state.shape
         # 2 types of data for gpt
-        tokens = torch.zeros(batch_size, seq_len*2, self.d_model, device=self.device, dtype=torch.bfloat16)
+        tokens = torch.zeros(batch_size, seq_len*2, self.d4_model, device=self.device)
         tokens[:, 0::2, :] = state
         tokens[:, 1::2, :] = action
 
         tokens = self.gpt_model(inputs_embeds = tokens).last_hidden_state
         tokens = tokens[:, 0::2, :]
         tokens = self.q_weights(tokens)
-        an = self.k_weights(an).unsqueeze(0)
-        attention_scores = torch.matmul(tokens, an.transpose(1, 2))
+        an = self.k_weights(act_vocab_token.to(dtype=torch.float32))
+        attention_scores = torch.matmul(tokens, an.unsqueeze(0).transpose(1,2))
         return attention_scores
 
 ###
 #Functions
 ###
+
+def action2token_vocab(action, act_vocab_coords, act_vocab_tokens):
+    '''
+    Convert action on coordinates (quaternions) shaped:
+    [seq_length, 4] or [batch_size, seq_length, 4]
+    to action in encoder representation (batch_size, seq_length, d_model) 
+    '''
+    #print('check correctness')
+    #print(action.shape)
+    #print(act_vocab_coords.shape)
+    #print(act_vocab_tokens.shape)
+
+    act_vocab_coords = act_vocab_coords.unsqueeze(0)
+
+    if action.dim() == 2:
+        action = action.unsqueeze(0)
+    batch_size = action.shape[0] 
+    
+    # Compute cosine similarity (batch_size, seq_length, vocab_size)
+    similarity_scores = F.cosine_similarity(action.unsqueeze(2), act_vocab_coords.unsqueeze(0), dim=-1)
+
+    # Find the max similarity scores and their indices
+    max_values, max_indices = torch.max(similarity_scores, dim=-1)
+    if torch.min(max_values).item() < 0.999:
+        print('Warning: action coordinates not match vocabulary!!!')
+    a = []
+    aa= []
+    for i in range(batch_size):
+        for j in max_indices[i]:
+            a.append(act_vocab_tokens[j])
+        aa.append(torch.stack(a, dim=0))
+    aa = torch.stack(aa, dim=0)
+    return aa
 
 def padding_collate(batch):
     #num_data_types = len(batch[0])
@@ -447,12 +462,16 @@ if __name__ == '__main__':
     prompt_filename = DATASET[:-3]+'_tasks.txt'
     with open(prompt_filename, 'r') as file:
         for p in file:
-            prompt.append(p.strip())
+            formatted_prompt = "USER: <image>\n" + p.strip() + " ASSISTANT:"
+            #prompt.append(p.strip())
+            prompt.append(formatted_prompt) 
 
     annot_prompt_filename = ACTION_ANNOTATION[:-3]+'_tasks.txt'
     with open(annot_prompt_filename, 'r') as file:
         for p in file:
-            act_vocab_prompt.append(p.strip())
+            formatted_prompt = "USER: <image>\n" + p.strip() + " ASSISTANT:"
+            act_vocab_prompt.append(formatted_prompt)
+            # act_vocab_prompt.append(p.strip())
     print(act_vocab_prompt)
 
 
@@ -507,7 +526,6 @@ if __name__ == '__main__':
             map.append(map_i)
             #map_i = im_processor(images=map_i, return_tensors="pt")['pixel_values']
             im_i = torch.from_numpy(im_group[episode][:]).float()
-            #print('here', im_i.shape, map_i.shape)
             im.append(im_i)
             episode_len = im_i.shape[0]
             a = torch.from_numpy(action_group[episode][:])
