@@ -59,20 +59,20 @@ ACTION_ANNOTATION = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real
 #DATASET = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/tsa_combined.h5'
 #ACTION_ANNOTATION = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/poses/poses_2024-04-25_15-00-52.h5'
 
-DEVICE = 'cuda:0'
+DEVICE = 'cuda:1'
 
-LR = 10e-5
+LR = 10e-7
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
-UPDATE_ANNOT_RATE = 10000
+UPDATE_ANNOT_RATE = 1
 
 TEST_PART = 0.2
 BATCH_SIZE = 1
 CHECKPOINT_INTERVAL = 25
 
 WEIGHTS_DIR = '/data/renas/pythonprogv2/phd_xiaor_project/weights'
-LOAD_WEIGHTS = 'renas10.pt'
-SAVE_WEIGHTS = 'renas10.pt'
+LOAD_WEIGHTS = 'renas10_vilt.pt'
+SAVE_WEIGHTS = 'renas10_vilt.pt'
 
 ###
 #CLASSES
@@ -125,8 +125,8 @@ class Renas10forTrain(torch.nn.Module):
         #set d_model manually in exceptional cases
         #self.d_model = 2048
         self.processor = ViltProcessor.from_pretrained("dandelin/vilt-b32-mlm")
-        self.processor.current_processor.do_rescale = True
-        self.processor.current_processor.do_resize = True
+        self.processor.current_processor.do_rescale = False
+        self.processor.current_processor.do_resize = False
         self.processor.current_processor.do_normalize = False
 
         self.vilt_model = ViltModel.from_pretrained("dandelin/vilt-b32-mlm")
@@ -138,7 +138,7 @@ class Renas10forTrain(torch.nn.Module):
         self.im_prompt_enc_vector = EncodingVector(d_model=self.d_model)
         self.actions_enc_vector = EncodingVector(d_model=self.d_model)
         
-        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=6, n_head=32)
+        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=7, n_head=32)
         self.gpt_model = OpenAIGPTModel(self.gpt_config)
 
         #Weights for final cross-attention multiple choice
@@ -151,13 +151,12 @@ class Renas10forTrain(torch.nn.Module):
             #Work with action annotation
             act_vocab_token = []
             for i, im_i in enumerate(act_vocab_im):
-                self.processor.current_processor.do_rescale = True
+                im_i = torch.cat((im_i, act_vocab_map[i][0]), dim=1)
                 inputs = self.processor(images=im_i, text= act_vocab_prompt[i], return_tensors="pt")
-                self.processor.current_processor.do_rescale = False
-                inputs2 = self.processor(images=[act_vocab_map[i][j] for j in range(1)], text=[act_vocab_prompt[i]], return_tensors="pt")
+                #inputs = self.processor(images=[act_vocab_map[i][j] for j in range(1)], text=[act_vocab_prompt[i]], return_tensors="pt")
 
-                im_i = torch.cat((inputs['pixel_values'], inputs2['pixel_values']), dim=3)
-                inputs = self.processor(images=[im_i[j] for j in range(1)], text=[act_vocab_prompt[i]], return_tensors="pt")
+                #im_i = torch.cat((inputs['pixel_values'], inputs2['pixel_values']), dim=3)
+                #inputs = self.processor(images=[im_i[j] for j in range(1)], text=[act_vocab_prompt[i]], return_tensors="pt")
                 inputs = {key: val.to(device) for key, val in inputs.items()}
                 outputs = self.vilt_model.forward(**inputs, return_dict=True)
                 #print('Action annotation token shape:', outputs.pooler_output.shape)
@@ -174,14 +173,13 @@ class Renas10forTrain(torch.nn.Module):
         state = []
         for i, im_i in enumerate(im):
             episode_len = im_i.shape[0]
-            self.processor.current_processor.do_rescale = True
-            inputs = self.processor(images=[im_i[j] for j in range(episode_len)], text=[prompt[i]]*episode_len, return_tensors="pt")
-            self.processor.current_processor.do_rescale = False
-            inputs2 = self.processor(images=[map[i][j] for j in range(episode_len)], text=[prompt[i]]*episode_len, return_tensors="pt")
+            im_i = torch.cat((im_i, map[i]), dim=2)
+            inputs = self.processor(images=im_i, text=[prompt[i]]*episode_len, return_tensors="pt")
+            #inputs = self.processor(images=[map[i][j] for j in range(episode_len)], text=[prompt[i]]*episode_len, return_tensors="pt")
             
-            im_i = torch.cat((inputs['pixel_values'], inputs2['pixel_values']), dim=3)
+            #im_i = torch.cat((inputs['pixel_values'], inputs2['pixel_values']), dim=3)
             
-            inputs = self.processor(images=[im_i[j] for j in range(episode_len)], text=[prompt[i]]*episode_len, return_tensors="pt")
+            #inputs = self.processor(images=[im_i[j] for j in range(episode_len)], text=[prompt[i]]*episode_len, return_tensors="pt")
             #inputs['pixel_values'] = torch.cat((inputs['pixel_values'], inputs2['pixel_values']), dim=3)
             inputs = {key: val.to(device) for key, val in inputs.items()}
 
@@ -477,9 +475,11 @@ if __name__ == '__main__':
                 map_i = map_group[annot][:]/100
                 map_i = draw_an_arrow_on_the_map(map_i, annot_mapinfo, pose_i)
                 map_i = torch.from_numpy(map_i).float()
+                map_i = F.interpolate(map_i, size=(112,224), mode='bilinear', align_corners=False)
                 act_vocab_map.append(map_i)
-                im_i = torch.from_numpy(im_group[annot][0]).float()
-                act_vocab_im.append(im_i)   
+                im_i = torch.from_numpy(im_group[annot][0]).float().permute(2,0,1).unsqueeze(0)
+                im_i = F.interpolate(im_i, size=(112,224), mode='bilinear', align_corners=False).squeeze(0)
+                act_vocab_im.append(im_i//255.0)   
                 act_vocab_coords.append(torch.from_numpy(action_group[annot][0]))
             else:
                 #For EOS token
@@ -506,10 +506,12 @@ if __name__ == '__main__':
             map_i = map_group[episode][:]/100
             map_i = draw_an_arrow_on_the_map(map_i, mapinfo, pose_i)
             map_i = torch.from_numpy(map_i).float()
+            map_i = F.interpolate(map_i, size=(112,224), mode='bilinear', align_corners=False)
             map.append(map_i)
             #map_i = im_processor(images=map_i, return_tensors="pt")['pixel_values']
-            im_i = torch.from_numpy(im_group[episode][:]).float()
-            im.append(im_i)
+            im_i = torch.from_numpy(im_group[episode][:]).float().permute(0, 3, 1, 2)
+            im_i = F.interpolate(im_i, size=(112,224), mode='bilinear', align_corners=False).squeeze(0)
+            im.append(im_i/255.0)
             episode_len = im_i.shape[0]
             a = torch.from_numpy(action_group[episode][:])
             #EOS token
