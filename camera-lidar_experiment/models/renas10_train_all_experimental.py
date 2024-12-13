@@ -59,7 +59,7 @@ ACTION_ANNOTATION = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real
 #DATASET = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/tsa_combined.h5'
 #ACTION_ANNOTATION = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/poses/poses_2024-04-25_15-00-52.h5'
 
-DEVICE = 'cuda:1'
+DEVICE = 'cuda:0'
 
 LR = 10e-7
 LR_WARMUP_EPOCHS = 5 

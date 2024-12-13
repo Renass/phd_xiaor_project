@@ -18,14 +18,12 @@ import json
 import cv2
 from scipy.spatial.transform import Rotation as R
 #from transformers import ViltProcessor, ViltModel
-#from transformers import Blip2Processor, Blip2ForConditionalGeneration
-from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration
-from torchvision import transforms
+from transformers import VisualBertModel, ViltProcessor
+
+
 
 '''
-!!!CLS token added in text could not be the first and wrong be accessed in forward pass
-!!!Not suit 50gb VRAM
-!!!LLAVA hidden_layer returned in x4 format and gpt d_model should be fixed to d4_model = d_model*4 
+*ERROR VisualBERT requires manual image processing with fastRCNN
 TRAIN LOOP for Renas MODEL 10 with multimodal encoder Included in training
 *ALL steps in one file - no prior preprocessing steps
 *IM PRETRAIN WITH ARROW LIKE IN RENAS6 MODEL
@@ -39,8 +37,8 @@ File work:
    
 MODEL 10:
     Behavioral cloning Renas  transformer camera-lidar
-    1. TEXT-Image camera or (camera+map concatenation) ENCODER using LLAVA 
-    2. FLAVA decoder for text generation 
+    1. TEXT-Image camera or (camera+map concatenation) ENCODER using VisualBERT 
+    2. NO TEXT GENERATION 
     
     3. (im_prompt)-(action) history-aware causal driving Transformer GPT
     Loss: cross-attention metrics going to CrossEntropyLoss 
@@ -70,15 +68,15 @@ DEVICE = 'cuda:0'
 LR = 10e-7
 LR_WARMUP_EPOCHS = 5 
 LR_DECAY_EPOCHS = 100
-UPDATE_ANNOT_RATE = 10000
+UPDATE_ANNOT_RATE = 1
 
 TEST_PART = 0.2
 BATCH_SIZE = 1
 CHECKPOINT_INTERVAL = 25
 
 WEIGHTS_DIR = '/data/renas/pythonprogv2/phd_xiaor_project/weights'
-LOAD_WEIGHTS = 'renas10.pt'
-SAVE_WEIGHTS = 'renas10.pt'
+LOAD_WEIGHTS = 'none'
+SAVE_WEIGHTS = 'none'
 
 ###
 #CLASSES
@@ -130,40 +128,21 @@ class Renas10forTrain(torch.nn.Module):
         self.device = device
         #set d_model manually in exceptional cases
         #self.d_model = 2048
-        self.processor = LlavaNextProcessor.from_pretrained("llava-hf/llava-v1.6-mistral-7b-hf")
-        self.processor.image_processor.do_rescale = False
-        self.processor.image_processor.do_resize = False
-        self.processor.image_processor.do_normalize = False
+        self.processor = ViltProcessor.from_pretrained("dandelin/vilt-b32-mlm")
+        self.processor.current_processor.do_rescale = False
+        self.processor.current_processor.do_resize = False
+        self.processor.current_processor.do_normalize = False
 
-        self.encoder_model = LlavaNextForConditionalGeneration.from_pretrained("llava-hf/llava-v1.6-mistral-7b-hf", torch_dtype=torch.float16)
-
-        self.d_model = self.encoder_model.config.vision_config.hidden_size
-        self.d4_model = self.d_model *4
-
-        #self.hidden_reduction = torch.nn.Linear(4*self.d_model, self.d_model) 
-
-        #print('here0', self.encoder_model)
-        #print('here', self.encoder_model.language_model.model.layers[0])
-        #print('here1', self.encoder_model.vision_tower.vision_model.encoder.layers[0])  
-
-        lang_layers=32
-        im_layers = 24
-        unfreeze_lang_layers_last = 1
-        unfreeze_im_layers_last = 1
-        for param in self.encoder_model.parameters():
-            param.requires_grad = True
-        #for i in range(lang_layers - unfreeze_lang_layers_last, lang_layers):
-        #    for param in self.encoder_model.language_model.model.layers[i].parameters():
-        #        param.requires_grad = True
-        #for i in range(im_layers - unfreeze_im_layers_last, im_layers):
-        #    for param in self.encoder_model.vision_tower.vision_model.encoder.layers[i].parameters():
-        #        param.requires_grad = True
+        self.vlm_model = VisualBertModel.from_pretrained("uclanlp/visualbert-vqa")
+        self.d_model = self.vlm_model.config.hidden_size
+        for param in self.vlm_model.parameters():
+            param.requires_grad = True  
 
         self.pos_enc = PositionalEncoding(d_model=self.d_model)
         self.im_prompt_enc_vector = EncodingVector(d_model=self.d_model)
         self.actions_enc_vector = EncodingVector(d_model=self.d_model)
         
-        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=3, n_head=32)
+        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=7, n_head=32)
         self.gpt_model = OpenAIGPTModel(self.gpt_config)
 
         #Weights for final cross-attention multiple choice
@@ -171,68 +150,59 @@ class Renas10forTrain(torch.nn.Module):
         self.k_weights = torch.nn.Linear(self.d_model, self.d_model)
 
     def annot_forward(self, act_vocab_im, act_vocab_prompt, act_vocab_map):
-        #for im_i in act_vocab_im:
-            #print(im_i.shape)
-        #for im_i in act_vocab_map:
-            #print(im_i.shape)
         with torch.no_grad():
-            #ViLT encoder
+            #VLM encoder
             #Work with action annotation
             act_vocab_token = []
             for i, im_i in enumerate(act_vocab_im):
-                #print(im_i.shape)
-                #print(torch.max(im_i))
-                #print(act_vocab_map[i].shape)
-                #self.processor.image_processor.do_rescale = True
+                im_i = torch.cat((im_i, act_vocab_map[i][0]), dim=1)
                 inputs = self.processor(images=im_i, text= act_vocab_prompt[i], return_tensors="pt")
-                #self.processor.image_processor.do_rescale = False
-                inputs2 = self.processor(images=[act_vocab_map[i][j] for j in range(1)], text=[act_vocab_prompt[i]], return_tensors="pt")
-                im_i = torch.cat((inputs['pixel_values'], inputs2['pixel_values']), dim=1)
-                #inputs = self.processor(images=[im_i[j] for j in range(1)], text=[act_vocab_prompt[i]], return_tensors="pt")
-                inputs['pixel_values'] = im_i
-                inputs = {key: val.to(device) for key, val in inputs.items()}
-                outputs = self.encoder_model.forward(**inputs, return_dict=True, output_hidden_states = True)
-                #print('Action annotation token shape:', outputs.pooler_output.shape)
-                
-                #print('here')
-                #print(outputs.hidden_states[-1].shape)
-                #print(self.d_model)
+                #inputs = self.processor(images=[act_vocab_map[i][j] for j in range(1)], text=[act_vocab_prompt[i]], return_tensors="pt")
 
-                #outputs = self.hidden_reduction(outputs.hidden_states[-1].float())
-                #outputs = torch.mean(outputs, dim=1, keepdim=False)
-                outputs = outputs.hidden_states[-1][:, 0, :]
+                #im_i = torch.cat((inputs['pixel_values'], inputs2['pixel_values']), dim=3)
+                #inputs = self.processor(images=[im_i[j] for j in range(1)], text=[act_vocab_prompt[i]], return_tensors="pt")
                 
-                act_vocab_token.append(outputs)     
+
+                inputs['visual_embeds'] = inputs.pop('pixel_values')
+                inputs.pop('pixel_values', None)
+                inputs.pop('pixel_mask', None)
+                inputs['visual_attention_mask'] = torch.ones(inputs['visual_embeds'].shape[:-1])
+                print('here')
+                print(inputs.keys())
+                print(inputs['input_ids'].shape)
+                print(inputs['attention_mask'].shape)
+                print(inputs['visual_embeds'].shape)
+                print(inputs['visual_attention_mask'].shape)
+
+                inputs = {key: val.to(device) for key, val in inputs.items()}
+                outputs = self.vlm_model.forward(**inputs, return_dict=True)
+                #print('Action annotation token shape:', outputs.pooler_output.shape)
+                act_vocab_token.append(outputs.pooler_output)     
             #For EOS token
             act_vocab_token.append(torch.ones_like(act_vocab_token[0]))
             act_vocab_token = torch.cat(act_vocab_token, dim=0)
             return act_vocab_token
 
     def forward(self, batch, act_vocab_token):
-        #ViLT encoder
+        #VLM encoder
         #work with dataset
         im, prompt, action, _, map = batch
         state = []
         for i, im_i in enumerate(im):
             episode_len = im_i.shape[0]
-            #self.processor.image_processor.do_rescale = True
-            inputs = self.processor(images=[im_i[j] for j in range(episode_len)], text=[prompt[i]]*episode_len, return_tensors="pt")
-            #self.processor.image_processor.do_rescale = False
-            inputs2 = self.processor(images=[map[i][j] for j in range(episode_len)], text=[prompt[i]]*episode_len, return_tensors="pt")
+            im_i = torch.cat((im_i, map[i]), dim=2)
+            inputs = self.processor(images=im_i, text=[prompt[i]]*episode_len, return_tensors="pt")
+            #inputs = self.processor(images=[map[i][j] for j in range(episode_len)], text=[prompt[i]]*episode_len, return_tensors="pt")
             
-            im_i = torch.cat((inputs['pixel_values'], inputs2['pixel_values']), dim=1)
-            inputs['pixel_values'] = im_i
+            #im_i = torch.cat((inputs['pixel_values'], inputs2['pixel_values']), dim=3)
+            
             #inputs = self.processor(images=[im_i[j] for j in range(episode_len)], text=[prompt[i]]*episode_len, return_tensors="pt")
             #inputs['pixel_values'] = torch.cat((inputs['pixel_values'], inputs2['pixel_values']), dim=3)
             inputs = {key: val.to(device) for key, val in inputs.items()}
 
-            outputs = self.encoder_model.forward(**inputs, return_dict=True, output_hidden_states = True)
-            outputs = outputs.hidden_states[-1][:, 0, :]
-            
-            #outputs = self.hidden_reduction(outputs.hidden_states[-1].float())
-            #outputs = torch.mean(outputs, dim=1, keepdim=False)
+            outputs = self.vlm_model.forward(**inputs, return_dict=True)
             #print('states shape:', outputs.pooler_output.shape)
-            state.append(outputs)
+            state.append(outputs.pooler_output)
         state = torch.stack(state, dim=0)
 
         
@@ -256,7 +226,7 @@ class Renas10forTrain(torch.nn.Module):
         tokens = self.gpt_model(inputs_embeds = tokens).last_hidden_state
         tokens = tokens[:, 0::2, :]
         tokens = self.q_weights(tokens)
-        an = self.k_weights(act_vocab_token.to(dtype=torch.float32))
+        an = self.k_weights(act_vocab_token)
         attention_scores = torch.matmul(tokens, an.unsqueeze(0).transpose(1,2))
         return attention_scores
 
@@ -494,16 +464,12 @@ if __name__ == '__main__':
     prompt_filename = DATASET[:-3]+'_tasks.txt'
     with open(prompt_filename, 'r') as file:
         for p in file:
-            formatted_prompt = "[CLS] USER: <image>\n" + p.strip() + " ASSISTANT:"
-            #prompt.append(p.strip())
-            prompt.append(formatted_prompt) 
+            prompt.append(p.strip())
 
     annot_prompt_filename = ACTION_ANNOTATION[:-3]+'_tasks.txt'
     with open(annot_prompt_filename, 'r') as file:
         for p in file:
-            formatted_prompt = "[CLS] USER: <image>\n" + p.strip() + " ASSISTANT:"
-            act_vocab_prompt.append(formatted_prompt)
-            # act_vocab_prompt.append(p.strip())
+            act_vocab_prompt.append(p.strip())
     print(act_vocab_prompt)
 
 
@@ -526,13 +492,11 @@ if __name__ == '__main__':
                 map_i = map_group[annot][:]/100
                 map_i = draw_an_arrow_on_the_map(map_i, annot_mapinfo, pose_i)
                 map_i = torch.from_numpy(map_i).float()
-                map_i = F.interpolate(map_i, size=(336,336), mode='bilinear', align_corners=False)
+                map_i = F.interpolate(map_i, size=(112,224), mode='bilinear', align_corners=False)
                 act_vocab_map.append(map_i)
-                
                 im_i = torch.from_numpy(im_group[annot][0]).float().permute(2,0,1).unsqueeze(0)
-                im_i = F.interpolate(im_i, size=(336,336), mode='bilinear', align_corners=False).squeeze(0)
-                #print('here', im_i.shape)
-                act_vocab_im.append(im_i/255.0)   
+                im_i = F.interpolate(im_i, size=(112,224), mode='bilinear', align_corners=False).squeeze(0)
+                act_vocab_im.append(im_i//255.0)   
                 act_vocab_coords.append(torch.from_numpy(action_group[annot][0]))
             else:
                 #For EOS token
@@ -559,12 +523,11 @@ if __name__ == '__main__':
             map_i = map_group[episode][:]/100
             map_i = draw_an_arrow_on_the_map(map_i, mapinfo, pose_i)
             map_i = torch.from_numpy(map_i).float()
-            map_i = F.interpolate(map_i, size=(336,336), mode='bilinear', align_corners=False)
+            map_i = F.interpolate(map_i, size=(112,224), mode='bilinear', align_corners=False)
             map.append(map_i)
             #map_i = im_processor(images=map_i, return_tensors="pt")['pixel_values']
-            
             im_i = torch.from_numpy(im_group[episode][:]).float().permute(0, 3, 1, 2)
-            im_i = F.interpolate(im_i, size=(336,336), mode='bilinear', align_corners=False).squeeze(0)
+            im_i = F.interpolate(im_i, size=(112,224), mode='bilinear', align_corners=False).squeeze(0)
             im.append(im_i/255.0)
             episode_len = im_i.shape[0]
             a = torch.from_numpy(action_group[episode][:])
