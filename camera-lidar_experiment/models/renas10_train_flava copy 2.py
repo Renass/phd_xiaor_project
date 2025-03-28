@@ -60,7 +60,7 @@ ACTION_ANNOTATION = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real
 #DATASET = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/tsa_combined.h5'
 #ACTION_ANNOTATION = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/poses/poses_2024-04-25_15-00-52.h5'
 
-DEVICE = 'cuda:0'
+DEVICE = 'cuda:2'
 
 LR = 10e-7
 LR_WARMUP_EPOCHS = 5 
@@ -72,8 +72,8 @@ BATCH_SIZE = 1
 CHECKPOINT_INTERVAL = 25
 
 WEIGHTS_DIR = '/data/renas/pythonprogv2/phd_xiaor_project/weights'
-LOAD_WEIGHTS = 'no'
-SAVE_WEIGHTS = 'no'
+LOAD_WEIGHTS = 'renas_10_flava8_real'
+SAVE_WEIGHTS = 'renas_10_flava8_real'
 
 ###
 #CLASSES
@@ -139,7 +139,7 @@ class Renas10forTrain(torch.nn.Module):
         self.im_prompt_enc_vector = EncodingVector(d_model=self.d_model)
         self.actions_enc_vector = EncodingVector(d_model=self.d_model)
         
-        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=6, n_head=32)
+        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=8, n_head=32)
         self.gpt_model = OpenAIGPTModel(self.gpt_config)
 
         #Weights for final cross-attention multiple choice
@@ -517,9 +517,7 @@ if __name__ == '__main__':
             map.append(map_i)
             #map_i = im_processor(images=map_i, return_tensors="pt")['pixel_values']
             im_i = torch.from_numpy(im_group[episode][:]).float().permute(0, 3, 1, 2)
-            print('here', im_i.shape)
             im_i = F.interpolate(im_i, size=(112,224), mode='bilinear', align_corners=False).squeeze(0)
-            print('here1', im_i.shape)
             im.append(im_i/255.0)
             episode_len = im_i.shape[0]
             a = torch.from_numpy(action_group[episode][:])

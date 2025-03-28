@@ -7,7 +7,7 @@ import json
 fast check of content of hdf dataset
 now: print action
 '''
-DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/nav/real/tsa_combined.h5'
+DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/2A724_may/tsa_combined.h5'
 
 if __name__ == '__main__':
 

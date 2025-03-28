@@ -71,8 +71,8 @@ BATCH_SIZE = 1
 CHECKPOINT_INTERVAL = 25
 
 WEIGHTS_DIR = '/data/renas/pythonprogv2/phd_xiaor_project/weights'
-LOAD_WEIGHTS = 'renas10_vilt.pt'
-SAVE_WEIGHTS = 'renas10_vilt.pt'
+LOAD_WEIGHTS = 'no'
+SAVE_WEIGHTS = 'no'
 
 ###
 #CLASSES
@@ -138,7 +138,7 @@ class Renas10forTrain(torch.nn.Module):
         self.im_prompt_enc_vector = EncodingVector(d_model=self.d_model)
         self.actions_enc_vector = EncodingVector(d_model=self.d_model)
         
-        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=7, n_head=32)
+        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=8, n_head=32)
         self.gpt_model = OpenAIGPTModel(self.gpt_config)
 
         #Weights for final cross-attention multiple choice
@@ -352,7 +352,9 @@ def train_loop(train_dataset, test_dataset, act_vocab_coords, act_vocab_im, act_
         if (epoch-1)%UPDATE_ANNOT_RATE == 0:
             act_vocab_token = model.annot_forward(act_vocab_im, act_vocab_prompt, act_vocab_map) 
         for i, batch in enumerate(train_dataloader):
+            forward_pass_timestamp = time.time()
             output = model(batch, act_vocab_token)
+            print('forward pass time:', time.time()-forward_pass_timestamp)
             # print 1st batch 1st episode labels and predictions
             if i==0:
                 print('correct labels: ', batch[3][0])
