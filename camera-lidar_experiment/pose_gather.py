@@ -35,8 +35,7 @@ SAVE_DIR = 'TSA_dataset/real/poses'
 #    'position out of the 2A724 lab facing right side of the corridor'
 #]
 
-
-#Real 2A724_may.yaml
+# Real 2A724_december13.yaml
 POSES = [
     [2.57, -8.01, -0.35, 0.94],
     [7.86, -7.33, -0.96, 0.29],
@@ -44,6 +43,18 @@ POSES = [
     [3.47, -2.38, 0.88, 0.48],
     [4.00, -3.88, -0.93, 0.36]
 ]
+
+#Real 2A724_may.yaml
+#POSES = [
+#    [2.57, -8.01, -0.35, 0.94],
+#    [7.86, -7.33, -0.96, 0.29],
+#    [7.73, -7.41, 0.32, 0.95],
+#    [3.47, -2.38, 0.88, 0.48],
+#    [4.00, -3.88, -0.93, 0.36]
+#]
+
+
+
 DESCRIPTIONS = [
     'position facing fridge and rack',
     'position out of the 2A724 lab facing right side of the corridor',

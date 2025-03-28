@@ -157,7 +157,7 @@ class Renas10forTrain(torch.nn.Module):
 
                 #im_i = torch.cat((inputs['pixel_values'], inputs2['pixel_values']), dim=3)
                 #inputs = self.processor(images=[im_i[j] for j in range(1)], text=[act_vocab_prompt[i]], return_tensors="pt")
-                inputs = {key: val.to(device) for key, val in inputs.items()}
+                inputs = {key: val.to(self.device) for key, val in inputs.items()}
                 outputs = self.vilt_model.forward(**inputs, return_dict=True)
                 #print('Action annotation token shape:', outputs.pooler_output.shape)
                 act_vocab_token.append(outputs.pooler_output)     
@@ -166,7 +166,7 @@ class Renas10forTrain(torch.nn.Module):
             act_vocab_token = torch.cat(act_vocab_token, dim=0)
             return act_vocab_token
 
-    def forward(self, batch, act_vocab_token):
+    def forward(self, batch, act_vocab_token, act_vocab_coords):
         #ViLT encoder
         #work with dataset
         im, prompt, action, _, map = batch
@@ -181,7 +181,7 @@ class Renas10forTrain(torch.nn.Module):
             
             #inputs = self.processor(images=[im_i[j] for j in range(episode_len)], text=[prompt[i]]*episode_len, return_tensors="pt")
             #inputs['pixel_values'] = torch.cat((inputs['pixel_values'], inputs2['pixel_values']), dim=3)
-            inputs = {key: val.to(device) for key, val in inputs.items()}
+            inputs = {key: val.to(self.device) for key, val in inputs.items()}
 
             outputs = self.vilt_model.forward(**inputs, return_dict=True)
             #print('states shape:', outputs.pooler_output.shape)
@@ -352,9 +352,9 @@ def train_loop(train_dataset, test_dataset, act_vocab_coords, act_vocab_im, act_
         if (epoch-1)%UPDATE_ANNOT_RATE == 0:
             act_vocab_token = model.annot_forward(act_vocab_im, act_vocab_prompt, act_vocab_map) 
         for i, batch in enumerate(train_dataloader):
-            forward_pass_timestamp = time.time()
-            output = model(batch, act_vocab_token)
-            print('forward pass time:', time.time()-forward_pass_timestamp)
+            #forward_pass_timestamp = time.time()
+            output = model(batch, act_vocab_token, act_vocab_coords)
+            #print('forward pass time:', time.time()-forward_pass_timestamp)
             # print 1st batch 1st episode labels and predictions
             if i==0:
                 print('correct labels: ', batch[3][0])
@@ -383,7 +383,7 @@ def train_loop(train_dataset, test_dataset, act_vocab_coords, act_vocab_im, act_
         #Test part
         with torch.no_grad():
             for batch in test_dataloader:
-                output = model(batch, act_vocab_token)
+                output = model(batch, act_vocab_token, act_vocab_coords)
                 #output = model(batch, act_vocab_coords, act_vocab_tokens)
                 output_flat = output.view(-1, output.shape[-1])
                 labels_flat = batch[3].to(device).view(-1)

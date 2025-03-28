@@ -47,14 +47,18 @@ Start-up:
     4.rosrun teleop_twist_keyboard teleop_twist_keyboard.py
     5. xrrobot: roslaunch xrrobot camera.launch
     6. rosrun rqt_image_view rqt_image_view
+    
+    ? roslaunch xrrobot rplidar.launch
+
     7. launch navigation (move_base) with obstacle map supply (amcl) or mapping (SLAM)
     (SLAM + move_base): 
     * roslaunch xrrobot lidar_slam4.launch (SLAM + move_base)
-    * rosrun map_server map_saver -f ./maps/2A724_april
+    * rosrun map_server map_saver -f ./maps/2A724_december13
     (amcl + move_base):
     * roslaunch xrrobot navigate4.launch
     * rosrun map_server map_server ./maps/2A724_may.yaml
 
+    roscd xrrobot
     8. rviz -d ./navigate.rviz
 
     rosservice call /start_motor "{}" - Lidar service (sometimes helps when Lidar not publishing)
