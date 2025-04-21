@@ -52,8 +52,8 @@ DATA:
     (Im) or (Im-map), prompt
 '''
 #Main real dataset
-DATASET = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/2A724_may/tsa_combined.h5'
-ACTION_ANNOTATION = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/poses/poses_2024-05-04_18-10-20.h5'
+DATASET = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/2A724_may/tsa_combined.h5'
+ACTION_ANNOTATION = '/home/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/real/poses/poses_2024-05-04_18-10-20.h5'
 
 #Sim dataset target 100%
 #DATASET = '/data/renas/pythonprogv2/phd_xiaor_project/TSA_dataset/sim/tsa_combined.h5'
@@ -206,18 +206,16 @@ class Renas10forTrain(torch.nn.Module):
         tokens = torch.zeros(batch_size, seq_len*2, self.d_model, device=self.device)
         tokens[:, 0::2, :] = state
         tokens[:, 1::2, :] = action
-        #dummy_len = 1
         
-        #fake_state = torch.ones((1, dummy_len, 768), device=self.device)
-        #fake_action = torch.ones((1, dummy_len, 768), device=self.device)
+        #repeat_n = 100
+        #state = state.repeat(1, repeat_n, 1)  # shape: (1, 512, 768)
+        #action = action.repeat(1, repeat_n, 1)
+        #print('state', state.shape)
+        #print('actions', action.shape)
+        #tokens = torch.zeros(batch_size, seq_len*2*repeat_n, self.d_model, device=self.device)
+        #tokens[:, 0::2, :] = state
+        #tokens[:, 1::2, :] = action
 
-        #state = torch.cat((state, torch.ones([1,1,768])), device = self.device, dim=1)
-        #action = torch.cat((action, torch.ones([1,1,768])), device = self.device, dim=1)
-        repeat_n = 1000
-        state = state.repeat(1, repeat_n, 1)  # shape: (1, 512, 768)
-        action = action.repeat(1, repeat_n, 1)
-        print('state', state.shape)
-        print('actions', action.shape)
 
         tokens = self.gpt_model(inputs_embeds = tokens).last_hidden_state
         tokens = tokens[:, 0::2, :]

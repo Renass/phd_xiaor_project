@@ -214,11 +214,14 @@ class Renas10forTrain(torch.nn.Module):
         tokens[:, 0::2, :] = state
         tokens[:, 1::2, :] = action
 
-        repeat_n = 1000
-        state = state.repeat(1, repeat_n, 1)  # shape: (1, 512, 768)
-        action = action.repeat(1, repeat_n, 1)
-        print('state', state.shape)
-        print('actions', action.shape)
+        #repeat_n = 100
+        #state = state.repeat(1, repeat_n, 1)  # shape: (1, 512, 768)
+        #action = action.repeat(1, repeat_n, 1)
+        #print('state', state.shape)
+        #print('actions', action.shape)
+        #tokens = torch.zeros(batch_size, seq_len*2*repeat_n, self.d_model, device=self.device)
+        #tokens[:, 0::2, :] = state
+        #tokens[:, 1::2, :] = action
 
         tokens = self.gpt_model(inputs_embeds = tokens).last_hidden_state
         tokens = tokens[:, 0::2, :]
