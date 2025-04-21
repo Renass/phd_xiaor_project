@@ -8,7 +8,7 @@ import sys
 #import in python from 1 level parental directory
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from renas10_train_all_experimental import Renas10forTrain, draw_an_arrow_on_the_map, action2token_vocab 
+from renas10_train_flava import Renas10forTrain, draw_an_arrow_on_the_map, action2token_vocab 
 import trajectories_gather6
 
 import torch

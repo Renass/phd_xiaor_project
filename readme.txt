@@ -61,6 +61,7 @@ Start-up:
     roscd xrrobot
     8. rviz -d ./navigate.rviz
 
+    rosservice call /stop_motor "{}" 
     rosservice call /start_motor "{}" - Lidar service (sometimes helps when Lidar not publishing)
 
 3. GAZEBO virtual env (camera-lidar experiment): 
@@ -83,6 +84,13 @@ Start-up:
     5. (optional) camera view:
     * rosrun rqt_image_view rqt_image_view
     * rviz -d ./camera_view.rviz
+
+
+For REMOTE HEADLESS MASTER:
+Xvfb :1 -screen 0 1600x1200x24 &
+export DISPLAY=:1.0
+roslaunch mobile_manipulator_body 2A724_empty.launch gui:=false
+
 
 
 

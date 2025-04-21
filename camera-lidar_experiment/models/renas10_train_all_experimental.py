@@ -70,6 +70,7 @@ TEST_PART = 0.2
 BATCH_SIZE = 1
 CHECKPOINT_INTERVAL = 25
 
+GPT_LAYERS = 6
 WEIGHTS_DIR = '/data/renas/pythonprogv2/phd_xiaor_project/weights'
 LOAD_WEIGHTS = 'no'
 SAVE_WEIGHTS = 'no'
@@ -138,7 +139,7 @@ class Renas10forTrain(torch.nn.Module):
         self.im_prompt_enc_vector = EncodingVector(d_model=self.d_model)
         self.actions_enc_vector = EncodingVector(d_model=self.d_model)
         
-        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=8, n_head=32)
+        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=GPT_LAYERS, n_head=32)
         self.gpt_model = OpenAIGPTModel(self.gpt_config)
 
         #Weights for final cross-attention multiple choice
@@ -205,6 +206,18 @@ class Renas10forTrain(torch.nn.Module):
         tokens = torch.zeros(batch_size, seq_len*2, self.d_model, device=self.device)
         tokens[:, 0::2, :] = state
         tokens[:, 1::2, :] = action
+        #dummy_len = 1
+        
+        #fake_state = torch.ones((1, dummy_len, 768), device=self.device)
+        #fake_action = torch.ones((1, dummy_len, 768), device=self.device)
+
+        #state = torch.cat((state, torch.ones([1,1,768])), device = self.device, dim=1)
+        #action = torch.cat((action, torch.ones([1,1,768])), device = self.device, dim=1)
+        repeat_n = 1000
+        state = state.repeat(1, repeat_n, 1)  # shape: (1, 512, 768)
+        action = action.repeat(1, repeat_n, 1)
+        print('state', state.shape)
+        print('actions', action.shape)
 
         tokens = self.gpt_model(inputs_embeds = tokens).last_hidden_state
         tokens = tokens[:, 0::2, :]

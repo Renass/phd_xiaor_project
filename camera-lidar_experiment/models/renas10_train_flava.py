@@ -71,6 +71,7 @@ TEST_PART = 0.2
 BATCH_SIZE = 1
 CHECKPOINT_INTERVAL = 25
 
+GPT_LAYERS = 9
 WEIGHTS_DIR = '/data/renas/pythonprogv2/phd_xiaor_project/weights'
 LOAD_WEIGHTS = 'no'
 SAVE_WEIGHTS = 'no'
@@ -139,7 +140,7 @@ class Renas10forTrain(torch.nn.Module):
         self.im_prompt_enc_vector = EncodingVector(d_model=self.d_model)
         self.actions_enc_vector = EncodingVector(d_model=self.d_model)
         
-        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=6, n_head=32)
+        self.gpt_config = OpenAIGPTConfig(vocab_size=0, n_positions=200, n_embd=self.d_model, n_layer=GPT_LAYERS, n_head=32)
         self.gpt_model = OpenAIGPTModel(self.gpt_config)
 
         #Weights for final cross-attention multiple choice
@@ -158,7 +159,7 @@ class Renas10forTrain(torch.nn.Module):
 
                 #im_i = torch.cat((inputs['pixel_values'], inputs2['pixel_values']), dim=3)
                 #inputs = self.processor(images=[im_i[j] for j in range(1)], text=[act_vocab_prompt[i]], return_tensors="pt")
-                inputs = {key: val.to(device) for key, val in inputs.items()}
+                inputs = {key: val.to(self.device) for key, val in inputs.items()}
                 outputs = self.vlm_model.forward(**inputs, return_dict=True)
                 #print('Action annotation token shape:', outputs.pooler_output.shape)
                 
@@ -170,7 +171,7 @@ class Renas10forTrain(torch.nn.Module):
             act_vocab_token = torch.cat(act_vocab_token, dim=0)
             return act_vocab_token
 
-    def forward(self, batch, act_vocab_token):
+    def forward(self, batch, act_vocab_token, act_vocab_coords):
         #VLM encoder
         #work with dataset
         im, prompt, action, _, map = batch
@@ -185,7 +186,7 @@ class Renas10forTrain(torch.nn.Module):
             
             #inputs = self.processor(images=[im_i[j] for j in range(episode_len)], text=[prompt[i]]*episode_len, return_tensors="pt")
             #inputs['pixel_values'] = torch.cat((inputs['pixel_values'], inputs2['pixel_values']), dim=3)
-            inputs = {key: val.to(device) for key, val in inputs.items()}
+            inputs = {key: val.to(self.device) for key, val in inputs.items()}
 
             outputs = self.vlm_model.forward(**inputs, return_dict=True)
             #print('states shape:', outputs.pooler_output.shape)
@@ -212,6 +213,12 @@ class Renas10forTrain(torch.nn.Module):
         tokens = torch.zeros(batch_size, seq_len*2, self.d_model, device=self.device)
         tokens[:, 0::2, :] = state
         tokens[:, 1::2, :] = action
+
+        repeat_n = 1000
+        state = state.repeat(1, repeat_n, 1)  # shape: (1, 512, 768)
+        action = action.repeat(1, repeat_n, 1)
+        print('state', state.shape)
+        print('actions', action.shape)
 
         tokens = self.gpt_model(inputs_embeds = tokens).last_hidden_state
         tokens = tokens[:, 0::2, :]

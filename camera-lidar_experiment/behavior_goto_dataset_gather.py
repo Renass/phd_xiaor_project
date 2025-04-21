@@ -30,16 +30,17 @@ rostopic pub /task diagnostic_msgs/KeyValue "{key: 'end_task', value: 'done'}"
 '''
 
 BUFFER_SIZE = 7
-SAVE_DIR = 'TSA_dataset/real/2A724_may'
+SAVE_DIR = 'TSA_dataset/real/2A724_may2'
 
 IMAGE_TOPIC = '/camera/rgb/image_raw'
 #IMAGE_TOPIC = '/image_raw'
 
 #MAP_SERVICE = '/dynamic_map'
+#Static with amcl map server, dynamic for slam
 MAP_SERVICE = '/static_map'
 ACTION_ROSTOPIC = '/move_base_simple/goal'
 
-PROMPT = 'go outside of the lab and turn right'
+PROMPT = 'Go to the sofa, if you see a green cone, go to the fridge'
 
 #Sim 2A724_x3.yaml
 #Fridge target
@@ -118,13 +119,14 @@ STARTING_POINTS = [
 #    fridgge
 #    [2.57, -8.01, -0.35, 0.94]
 #]
-#TARGET = [
-#    sofa
-#   [4.00, -3.88, -0.93, 0.36]
-#]
+#SOFA
 TARGET = [
-    [7.86, -7.33, -0.96, 0.29]
+   [4.00, -3.88, -0.93, 0.36]
 ]
+#Outside the lab and right
+#TARGET = [
+ #   [7.86, -7.33, -0.96, 0.29],
+#]
 
 def publish_pose(publisher, action):
     goal_msg = PoseStamped()
